@@ -5,10 +5,10 @@ import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Blood Bank Status Screen (`https://hospital.hrpocket.in/admin/bloodbankstatus` — matches image-9 1-to-1):
-/// - Header: `Blood Bank Status` + `[Donor Details]` button
-/// - 8 Blood Group Stock Cards (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`)
-///   displaying `Blood Group` and `Available Bags` directly from `/api/blood-bank`.
+/// Native Mobile Blood Bank Status Screen (`GET /api/blood-bank`):
+/// - Clean `MobileScreenHeader` + `[Donors]` action button
+/// - Summary banner with total available blood bags across all groups
+/// - Crisp 2x4 Blood Group Grid (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`)
 class BloodBankScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -94,112 +94,116 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
+    final primary = controller.personalTheme.primaryColor;
     final groups = _orderedGroups(
       _localOverride ?? controller.bloodBankGroups,
     );
+    final totalBags = groups.fold<int>(0, (sum, item) => sum + item.availableBags);
 
-    final body = RefreshIndicator(
-      color: const Color(0xFF0A4D78),
+    final content = RefreshIndicator(
+      color: primary,
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
         children: [
-          SoftSurfaceCard(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Row (`Blood Bank Status` + `[Donor Details]` — image-9)
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text(
-                        'Blood Bank Status',
+          if (widget.isEmbeddedInShell)
+            MobileScreenHeader(
+              title: 'Blood Bank',
+              subtitle: 'Live blood group stock & donor registry',
+              countBadge: '$totalBags Bags',
+              trailingAction: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _showDonorDetailsModal(context),
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.groups_rounded, size: 16, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text(
+                        'Donors',
                         style: TextStyle(
-                          color: Color(0xFF0F172A),
-                          fontSize: 18,
+                          color: Colors.white,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                    ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(0, 38),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                      onPressed: () => _showDonorDetailsModal(context),
-                      icon: const Icon(Icons.groups_rounded, size: 16),
-                      label: const Text(
-                        'Donor Details',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-
-                if (_refreshing)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: LinearProgressIndicator(),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 14),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    minimumSize: const Size(140, 40),
                   ),
-
-                const SizedBox(height: 14),
-                const Divider(height: 1),
-                const SizedBox(height: 16),
-
-                if (_error != null && groups.isEmpty)
-                  ClinicalErrorState(
-                    message: _error!,
-                    onRetry: _refresh,
-                  )
-                else if (groups.isEmpty)
-                  const ClinicalEmptyState(
-                    icon: Icons.water_drop_outlined,
-                    title: 'No Blood Bank Stock Returned',
-                    subtitle:
-                        'Pull down to refresh blood group inventory from /api/blood-bank.',
-                  )
-                else
-                  GridView.builder(
-                    itemCount: groups.length,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      childAspectRatio: 1.25,
-                    ),
-                    itemBuilder: (context, index) {
-                      final item = groups[index];
-                      return _BloodGroupStockCard(item: item);
-                    },
-                  ),
-              ],
+                  onPressed: () => _showDonorDetailsModal(context),
+                  icon: const Icon(Icons.groups_rounded, size: 17),
+                  label: const Text('Donor Details'),
+                ),
+              ),
             ),
-          ),
+
+          if (_refreshing)
+            const Padding(
+              padding: EdgeInsets.only(bottom: 12),
+              child: LinearProgressIndicator(),
+            ),
+
+          if (_error != null && groups.isEmpty)
+            SoftSurfaceCard(
+              child: ClinicalErrorState(
+                message: _error!,
+                onRetry: _refresh,
+              ),
+            )
+          else if (groups.isEmpty)
+            const SoftSurfaceCard(
+              child: ClinicalEmptyState(
+                icon: Icons.water_drop_outlined,
+                title: 'No Blood Bank Stock Returned',
+                subtitle: 'Pull down to refresh blood group inventory.',
+              ),
+            )
+          else
+            GridView.builder(
+              itemCount: groups.length,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.32,
+              ),
+              itemBuilder: (context, index) {
+                return _BloodGroupStockCard(item: groups[index]);
+              },
+            ),
         ],
       ),
     );
 
-    if (widget.isEmbeddedInShell) return body;
+    if (widget.isEmbeddedInShell) {
+      return SafeArea(bottom: false, child: content);
+    }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Blood Bank Status')),
-      body: body,
+      body: content,
     );
   }
 
@@ -208,10 +212,11 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return _DonorDetailsSheet(controller: controller);
-      },
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (ctx) => _DonorDetailsSheet(controller: controller),
     );
   }
 }
@@ -223,74 +228,52 @@ class _BloodGroupStockCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x060F172A),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
+    final lowStock = item.availableBags <= 3;
+
+    return SoftSurfaceCard(
+      padding: const EdgeInsets.all(15),
+      borderRadius: BorderRadius.circular(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Blood Group',
-                      style: TextStyle(
-                        color: Color(0xFF64748B),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.bloodGroup,
-                      style: const TextStyle(
-                        color: Color(0xFF991B1B),
-                        fontSize: 24,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ],
+              Text(
+                item.bloodGroup,
+                style: const TextStyle(
+                  color: Color(0xFFBE123C),
+                  fontSize: 26,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
                 ),
               ),
               Container(
-                width: 38,
-                height: 38,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFFFE4E6),
-                  shape: BoxShape.circle,
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF1F2),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Icons.water_drop_outlined,
+                  Icons.water_drop_rounded,
                   color: Color(0xFFE11D48),
-                  size: 20,
+                  size: 19,
                 ),
               ),
             ],
           ),
-          const Divider(height: 1),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              const Text(
-                'Available Bags',
+              Text(
+                lowStock ? 'Low Stock' : 'Available Bags',
                 style: TextStyle(
-                  color: Color(0xFF475569),
+                  color: lowStock
+                      ? const Color(0xFFD97706)
+                      : AppColors.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
@@ -298,8 +281,8 @@ class _BloodGroupStockCard extends StatelessWidget {
               Text(
                 '${item.availableBags}',
                 style: const TextStyle(
-                  color: Color(0xFF0F172A),
-                  fontSize: 18,
+                  color: AppColors.textPrimary,
+                  fontSize: 20,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -342,20 +325,16 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.80,
       ),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
       padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 40,
+              width: 38,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey.shade300,
+                color: AppColors.border,
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -363,18 +342,12 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
           const SizedBox(height: 14),
           Row(
             children: [
-              const Icon(
-                Icons.water_drop_rounded,
-                color: Color(0xFFE11D48),
-              ),
+              const Icon(Icons.water_drop_rounded, color: Color(0xFFE11D48)),
               const SizedBox(width: 8),
               const Expanded(
                 child: Text(
-                  'Blood Donor Details',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
+                  'Blood Donor Directory',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                 ),
               ),
               IconButton(
@@ -424,13 +397,8 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final d = filtered[index];
-                    return Container(
+                    return SoftSurfaceCard(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
                       child: Row(
                         children: [
                           Container(
@@ -438,13 +406,13 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                             height: 42,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFE4E6),
-                              borderRadius: BorderRadius.circular(10),
+                              color: const Color(0xFFFFF1F2),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               d.bloodGroup.isEmpty ? '-' : d.bloodGroup,
                               style: const TextStyle(
-                                color: Color(0xFF991B1B),
+                                color: Color(0xFFBE123C),
                                 fontWeight: FontWeight.w900,
                                 fontSize: 14,
                               ),

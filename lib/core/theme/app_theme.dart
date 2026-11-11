@@ -3,54 +3,54 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Primary Nurse Portal Royal Blue Palette (Ocean Sapphire default)
-  static const Color primary = Color(0xFF0B53A6);
-  static const Color primaryDark = Color(0xFF073B7A);
-  static const Color primaryLight = Color(0xFF1E74D6);
-  static const Color accentSky = Color(0xFF3B8EEA);
+  // Primary Clinical Sapphire Palette
+  static const Color primary = Color(0xFF0F4C81);
+  static const Color primaryDark = Color(0xFF093257);
+  static const Color primaryLight = Color(0xFF2563EB);
+  static const Color accentSky = Color(0xFF0284C7);
 
-  // Backgrounds & Surfaces
-  static const Color scaffoldBg = Color(0xFFF1F6FD);
-  static const Color skySurface = Color(0xFFE6F0FC);
+  // Clean Modern Mobile Surfaces
+  static const Color scaffoldBg = Color(0xFFF5F7FA);
+  static const Color skySurface = Color(0xFFEFF6FF);
   static const Color cardSurface = Color(0xFFFFFFFF);
-  static const Color inputFill = Color(0xFFF5F8FD);
-  static const Color border = Color(0xFFDCE7F5);
-  static const Color divider = Color(0xFFE7EFFA);
+  static const Color inputFill = Color(0xFFFFFFFF);
+  static const Color border = Color(0xFFE5EAF2);
+  static const Color divider = Color(0xFFEEF2F6);
 
-  // Typography
-  static const Color textPrimary = Color(0xFF0F2544);
-  static const Color textSecondary = Color(0xFF566B88);
-  static const Color textMuted = Color(0xFF889BB5);
+  // Crisp Editorial Typography
+  static const Color textPrimary = Color(0xFF0F172A);
+  static const Color textSecondary = Color(0xFF475569);
+  static const Color textMuted = Color(0xFF94A3B8);
 
-  // Clinical Semantic Status Colors
-  static const Color success = Color(0xFF1F9D55);
-  static const Color successSoft = Color(0xFFE6F6ED);
+  // Semantic Clinical Colors
+  static const Color success = Color(0xFF10B981);
+  static const Color successSoft = Color(0xFFECFDF5);
 
-  static const Color warning = Color(0xFFEA7A18);
-  static const Color warningSoft = Color(0xFFFFF2E2);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color warningSoft = Color(0xFFFFFBEB);
 
-  static const Color danger = Color(0xFFD93036);
-  static const Color dangerSoft = Color(0xFFFDEAEB);
+  static const Color danger = Color(0xFFEF4444);
+  static const Color dangerSoft = Color(0xFFFEF2F2);
 
-  static const Color info = Color(0xFF1565C0);
-  static const Color infoSoft = Color(0xFFE4F0FE);
+  static const Color info = Color(0xFF2563EB);
+  static const Color infoSoft = Color(0xFFEFF6FF);
 
   static const Color teal = Color(0xFF0D9488);
-  static const Color tealSoft = Color(0xFFE2F7F5);
+  static const Color tealSoft = Color(0xFFF0FDFA);
 
-  static const Color purple = Color(0xFF6D28D9);
-  static const Color purpleSoft = Color(0xFFF0E9FE);
+  static const Color purple = Color(0xFF7C3AED);
+  static const Color purpleSoft = Color(0xFFF5F3FF);
 
-  // Soft Card Shadow
-  static const Color cardShadow = Color(0x140B4F9E);
+  // Diffused Ambient Shadow
+  static const Color cardShadow = Color(0x0A0F172A);
 
   static const LinearGradient headerGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     colors: [
-      Color(0xFF08428A),
-      Color(0xFF0E5BB5),
-      Color(0xFF1C75D8),
+      Color(0xFF0B2545),
+      Color(0xFF0F4C81),
+      Color(0xFF1D6FA5),
     ],
   );
 
@@ -58,14 +58,14 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFFCDE2FC),
-      Color(0xFFEAF3FE),
+      Color(0xFFE0ECFA),
+      Color(0xFFF5F7FA),
       Color(0xFFFFFFFF),
     ],
   );
 }
 
-/// Exact 6 Personal Themes on `https://hospital.hrpocket.in/profile` -> `My Theme` (image-12)
+/// Exact 6 Personal Themes on `https://hospital.hrpocket.in/profile` -> `My Theme`
 class NursePersonalTheme {
   final String id;
   final String name;
@@ -85,7 +85,7 @@ class NursePersonalTheme {
     required this.appBarColor,
     this.appBarForeground = Colors.white,
     required this.primaryColor,
-    this.scaffoldColor = const Color(0xFFF1F6FD),
+    this.scaffoldColor = const Color(0xFFF5F7FA),
     this.isDarkBody = false,
   });
 
@@ -94,19 +94,19 @@ class NursePersonalTheme {
       id: 'ocean_sapphire',
       name: 'Ocean Sapphire',
       subtitle: 'High-Trust Clinical Command',
-      bannerGradient: [Color(0xFF042240), Color(0xFF026AA7)],
-      appBarColor: Color(0xFF0A4D78),
-      primaryColor: Color(0xFF0A4D78),
-      scaffoldColor: Color(0xFFF1F6FD),
+      bannerGradient: [Color(0xFF0B2545), Color(0xFF13548A)],
+      appBarColor: Color(0xFF0B2545),
+      primaryColor: Color(0xFF0F4C81),
+      scaffoldColor: Color(0xFFF5F7FA),
     ),
     NursePersonalTheme(
       id: 'bio_emerald',
       name: 'Bio-Emerald & Mint',
       subtitle: 'Fresh Wellness & Surgical Tech',
-      bannerGradient: [Color(0xFF042F24), Color(0xFF059669)],
-      appBarColor: Color(0xFF065F46),
-      primaryColor: Color(0xFF047857),
-      scaffoldColor: Color(0xFFF0FDF4),
+      bannerGradient: [Color(0xFF063729), Color(0xFF059669)],
+      appBarColor: Color(0xFF064E3B),
+      primaryColor: Color(0xFF059669),
+      scaffoldColor: Color(0xFFF4F9F6),
     ),
     NursePersonalTheme(
       id: 'glacier_blue',
@@ -122,29 +122,29 @@ class NursePersonalTheme {
       id: 'midnight_obsidian',
       name: 'Midnight Obsidian',
       subtitle: 'Sleek OLED Night Mode',
-      bannerGradient: [Color(0xFF090A10), Color(0xFF3730A3)],
-      appBarColor: Color(0xFF0D101C),
+      bannerGradient: [Color(0xFF090D16), Color(0xFF312E81)],
+      appBarColor: Color(0xFF0F172A),
       primaryColor: Color(0xFF4F46E5),
-      scaffoldColor: Color(0xFFEEF2FF),
+      scaffoldColor: Color(0xFFF3F4F8),
       isDarkBody: true,
     ),
     NursePersonalTheme(
       id: 'sunrise_coral',
       name: 'Sunrise Coral',
       subtitle: 'Human, Warm & Welcoming',
-      bannerGradient: [Color(0xFF3B1208), Color(0xFFEA580C)],
+      bannerGradient: [Color(0xFF431407), Color(0xFFEA580C)],
       appBarColor: Color(0xFF9A3412),
-      primaryColor: Color(0xFFC2410C),
-      scaffoldColor: Color(0xFFFFF7ED),
+      primaryColor: Color(0xFFD9480F),
+      scaffoldColor: Color(0xFFFAF6F3),
     ),
     NursePersonalTheme(
       id: 'royal_amethyst',
       name: 'Royal Amethyst',
       subtitle: 'Calm Precision & Authority',
-      bannerGradient: [Color(0xFF1E0B36), Color(0xFF7E22CE)],
+      bannerGradient: [Color(0xFF240B36), Color(0xFF7C3AED)],
       appBarColor: Color(0xFF4C1D95),
       primaryColor: Color(0xFF6D28D9),
-      scaffoldColor: Color(0xFFFAF5FF),
+      scaffoldColor: Color(0xFFF7F5FA),
     ),
   ];
 
@@ -179,16 +179,16 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: preset.scaffoldColor,
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
-        centerTitle: true,
+        centerTitle: false,
         foregroundColor: AppColors.textPrimary,
         titleTextStyle: TextStyle(
           color: AppColors.textPrimary,
           fontSize: 18,
-          fontWeight: FontWeight.w700,
-          letterSpacing: -0.2,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
         ),
       ),
       cardTheme: CardThemeData(
@@ -197,21 +197,21 @@ class AppTheme {
         elevation: 0,
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-          side: const BorderSide(color: AppColors.border, width: 0.9),
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.border, width: 1),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.inputFill,
+        fillColor: Colors.white,
         hintStyle: const TextStyle(
           color: AppColors.textMuted,
-          fontSize: 14,
-          fontWeight: FontWeight.w400,
+          fontSize: 13.5,
+          fontWeight: FontWeight.w500,
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 14,
+          horizontal: 15,
+          vertical: 13,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -223,7 +223,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: primary, width: 1.6),
+          borderSide: BorderSide(color: primary, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -235,28 +235,29 @@ class AppTheme {
           backgroundColor: primary,
           foregroundColor: Colors.white,
           elevation: 0,
-          minimumSize: const Size(double.infinity, 50),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 13),
+          minimumSize: const Size(double.infinity, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: const TextStyle(
-            fontSize: 14.5,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
+            letterSpacing: -0.1,
           ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: primary,
-          side: BorderSide(color: primary, width: 1.2),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
+          foregroundColor: AppColors.textPrimary,
+          backgroundColor: Colors.white,
+          side: const BorderSide(color: AppColors.border, width: 1),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
           textStyle: const TextStyle(
-            fontSize: 13.5,
+            fontSize: 13,
             fontWeight: FontWeight.w700,
           ),
         ),

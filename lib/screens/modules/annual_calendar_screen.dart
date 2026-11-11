@@ -6,12 +6,11 @@ import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Annual Calendar Screen (`https://hospital.hrpocket.in/calendar` — matches image-11 1-to-1):
-/// - Header: `Annual Calendar` + `India • 2026` blue pill + `N Holidays` green pill
-/// - Tabs: `Upcoming (N)` (default), `Today (N)`, `Past (N)`, `All Holidays (N)`
-/// - Filter & Search: `All Types` dropdown (`All Types`, `Holiday`, `Activity`, `Vacation`) + `Search description, date...`
-/// - Holiday Card: `Tue, 24 Nov, 2026`, `Holiday` amber pill, `Guru Nanak's Birthday`,
-///   `Government of India`, `Front Site: Yes` green pill, `Default` badge
+/// Native Mobile Annual Calendar Screen (`GET /api/holidays`):
+/// - Clean `MobileScreenHeader` (`Annual Calendar`, `N Holidays`, `India • 2026` badge)
+/// - Segmented Tabs (`Upcoming` default, `Today`, `Past`, `All Holidays`)
+/// - Type Filter + Search (`Search description, date...`)
+/// - Crisp floating white Holiday Cards (`Tue, 24 Nov, 2026`, `Guru Nanak's Birthday`, `Front Site: Yes`, `Default`).
 class AnnualCalendarScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -26,7 +25,7 @@ class AnnualCalendarScreen extends StatefulWidget {
 
 class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
   final _searchCtrl = TextEditingController();
-  String _selectedTab = 'upcoming'; // upcoming | today | past | all
+  String _selectedTab = 'upcoming';
   String _selectedType = 'All Types';
 
   @override
@@ -38,6 +37,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
+    final primary = controller.personalTheme.primaryColor;
     final allHolidays = List<HospitalHolidayItem>.from(controller.holidays)
       ..sort((a, b) {
         if (a.date == null && b.date == null) return 0;
@@ -47,8 +47,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
       });
 
     final now = DateTime.now();
-    final upcomingList =
-        allHolidays.where((h) => h.isUpcoming(now)).toList();
+    final upcomingList = allHolidays.where((h) => h.isUpcoming(now)).toList();
     final todayList = allHolidays.where((h) => h.isToday(now)).toList();
     final pastList = allHolidays.where((h) => h.isPast(now)).toList();
 
@@ -91,232 +90,145 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
       return true;
     }).toList();
 
-    final yearLabel = now.year;
-
-    final body = RefreshIndicator(
-      color: const Color(0xFF0A4D78),
+    final content = RefreshIndicator(
+      color: primary,
       onRefresh: () => controller.refreshWorkspace(),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 28),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
         children: [
-          // Header Card (`Annual Calendar` + `India • 2026` + `14 Holidays` — image-11)
-          SoftSurfaceCard(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (widget.isEmbeddedInShell)
+            MobileScreenHeader(
+              title: 'Annual Calendar',
+              subtitle: 'India • ${now.year} hospital holidays & notices',
+              countBadge: '${allHolidays.length}',
+            ),
+
+          // Tabs Row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0A4D78),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.calendar_month_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Wrap(
-                            spacing: 7,
-                            runSpacing: 5,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              const Text(
-                                'Annual Calendar',
-                                style: TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE0F2FE),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  'India • $yearLabel',
-                                  style: const TextStyle(
-                                    color: Color(0xFF0369A1),
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFDCFCE7),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${allHolidays.length} Holidays',
-                                  style: const TextStyle(
-                                    color: Color(0xFF15803D),
-                                    fontSize: 10.5,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 3),
-                          const Text(
-                            'Hospital Holidays, Activity Events, Important Dates & Front-Site Notices',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 11.5,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                _CalendarTabPill(
+                  label: 'Upcoming (${upcomingList.length})',
+                  selected: _selectedTab == 'upcoming',
+                  primary: primary,
+                  onTap: () => setState(() => _selectedTab = 'upcoming'),
                 ),
-
-                const SizedBox(height: 14),
-
-                // Tabs (`Upcoming (2)`, `Today (0)`, `Past (12)`, `All Holidays (14)` — image-11)
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _CalendarTabPill(
-                        label: 'Upcoming (${upcomingList.length})',
-                        selected: _selectedTab == 'upcoming',
-                        onTap: () => setState(() => _selectedTab = 'upcoming'),
-                      ),
-                      const SizedBox(width: 6),
-                      _CalendarTabPill(
-                        label: 'Today (${todayList.length})',
-                        selected: _selectedTab == 'today',
-                        onTap: () => setState(() => _selectedTab = 'today'),
-                      ),
-                      const SizedBox(width: 6),
-                      _CalendarTabPill(
-                        label: 'Past (${pastList.length})',
-                        selected: _selectedTab == 'past',
-                        onTap: () => setState(() => _selectedTab = 'past'),
-                      ),
-                      const SizedBox(width: 6),
-                      _CalendarTabPill(
-                        label: 'All Holidays (${allHolidays.length})',
-                        selected: _selectedTab == 'all',
-                        onTap: () => setState(() => _selectedTab = 'all'),
-                      ),
-                    ],
-                  ),
+                const SizedBox(width: 6),
+                _CalendarTabPill(
+                  label: 'Today (${todayList.length})',
+                  selected: _selectedTab == 'today',
+                  primary: primary,
+                  onTap: () => setState(() => _selectedTab = 'today'),
                 ),
-
-                const SizedBox(height: 12),
-
-                // Type Dropdown + Search Box (`All Types` + `Search description, date...` — image-11)
-                Row(
-                  children: [
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(11),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: activeType,
-                          isDense: true,
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 17,
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xFF334155),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                          items: typeOptions
-                              .map(
-                                (t) => DropdownMenuItem<String>(
-                                  value: t,
-                                  child: Text(t),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != null) setState(() => _selectedType = v);
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: TextField(
-                        controller: _searchCtrl,
-                        onChanged: (_) => setState(() {}),
-                        decoration: InputDecoration(
-                          hintText: 'Search description, date...',
-                          prefixIcon: const Icon(
-                            Icons.search_rounded,
-                            size: 19,
-                          ),
-                          suffixIcon: _searchCtrl.text.isNotEmpty
-                              ? IconButton(
-                                  icon: const Icon(
-                                    Icons.clear_rounded,
-                                    size: 18,
-                                  ),
-                                  onPressed: () {
-                                    _searchCtrl.clear();
-                                    setState(() {});
-                                  },
-                                )
-                              : null,
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(width: 6),
+                _CalendarTabPill(
+                  label: 'Past (${pastList.length})',
+                  selected: _selectedTab == 'past',
+                  primary: primary,
+                  onTap: () => setState(() => _selectedTab = 'past'),
                 ),
-
-                const SizedBox(height: 14),
-
-                if (filtered.isEmpty)
-                  const ClinicalEmptyState(
-                    icon: Icons.event_note_outlined,
-                    title: 'No Calendar Events in This View',
-                    subtitle: 'Switch tabs above or clear search filters.',
-                  )
-                else
-                  ...filtered.map((item) => _HolidayCard(item: item)),
+                const SizedBox(width: 6),
+                _CalendarTabPill(
+                  label: 'All (${allHolidays.length})',
+                  selected: _selectedTab == 'all',
+                  primary: primary,
+                  onTap: () => setState(() => _selectedTab = 'all'),
+                ),
               ],
             ),
           ),
+
+          const SizedBox(height: 12),
+
+          // Type Filter + Search Row
+          Row(
+            children: [
+              Container(
+                height: 46,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: activeType,
+                    isDense: true,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 17,
+                    ),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    items: typeOptions
+                        .map(
+                          (t) => DropdownMenuItem<String>(
+                            value: t,
+                            child: Text(t),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedType = v);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                  controller: _searchCtrl,
+                  onChanged: (_) => setState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Search description, date...',
+                    prefixIcon:
+                        Icon(Icons.search_rounded, size: 19, color: primary),
+                    suffixIcon: _searchCtrl.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              setState(() {});
+                            },
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          if (filtered.isEmpty)
+            const SoftSurfaceCard(
+              child: ClinicalEmptyState(
+                icon: Icons.event_note_outlined,
+                title: 'No Calendar Events in View',
+                subtitle: 'Switch tabs above or clear search filters.',
+              ),
+            )
+          else
+            ...filtered.map(
+              (item) => _HolidayCard(item: item, primaryColor: primary),
+            ),
         ],
       ),
     );
 
-    if (widget.isEmbeddedInShell) return body;
+    if (widget.isEmbeddedInShell) {
+      return SafeArea(bottom: false, child: content);
+    }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Annual Calendar')),
-      body: body,
+      body: content,
     );
   }
 }
@@ -324,31 +236,34 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
 class _CalendarTabPill extends StatelessWidget {
   final String label;
   final bool selected;
+  final Color primary;
   final VoidCallback onTap;
 
   const _CalendarTabPill({
     required this.label,
     required this.selected,
+    required this.primary,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(9),
+      borderRadius: BorderRadius.circular(20),
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF0A4D78) : const Color(0xFFF1F5F9),
-          borderRadius: BorderRadius.circular(9),
+          color: selected ? primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? primary : AppColors.border),
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : const Color(0xFF475569),
+            color: selected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -358,130 +273,175 @@ class _CalendarTabPill extends StatelessWidget {
 
 class _HolidayCard extends StatelessWidget {
   final HospitalHolidayItem item;
+  final Color primaryColor;
 
-  const _HolidayCard({required this.item});
+  const _HolidayCard({
+    required this.item,
+    required this.primaryColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Row: Date (`Tue, 24 Nov, 2026`) + Type (`Holiday`) + `Default`
-          Row(
-            children: [
-              const Icon(
-                Icons.calendar_today_outlined,
-                size: 14,
-                color: Color(0xFF475569),
+    final dt = item.date?.toLocal();
+    final dayNum = dt != null ? dt.day.toString().padLeft(2, '0') : '—';
+    const months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+    final monLabel = dt != null ? months[dt.month - 1] : '';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: SoftSurfaceCard(
+        padding: const EdgeInsets.all(14),
+        borderRadius: BorderRadius.circular(18),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Clean Calendar Leaf Badge on Left
+            Container(
+              width: 52,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: primaryColor.withAlpha(18),
+                borderRadius: BorderRadius.circular(14),
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  AppFormatters.formatCalendarDate(item.date),
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  item.type,
-                  style: const TextStyle(
-                    color: Color(0xFFB45309),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              if (item.isDefault) ...[
-                const SizedBox(width: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Text(
-                    'Default',
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    monLabel,
                     style: TextStyle(
-                      color: Color(0xFF475569),
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
+                      color: primaryColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Description (`Guru Nanak's Birthday` / `Christmas Day` — image-11)
-          Text(
-            item.title,
-            style: const TextStyle(
-              color: Color(0xFF0F172A),
-              fontSize: 15,
-              fontWeight: FontWeight.w800,
+                  Text(
+                    dayNum,
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Created By (`Government of India`) & Front Site (`Yes`)
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  'Created By: ${item.createdBy}',
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+            const SizedBox(width: 13),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warningSoft,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          item.type,
+                          style: const TextStyle(
+                            color: Color(0xFFD97706),
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: item.frontSite
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Front Site: ${item.frontSite ? "Yes" : "No"}',
-                  style: TextStyle(
-                    color: item.frontSite
-                        ? const Color(0xFF15803D)
-                        : const Color(0xFF64748B),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  const SizedBox(height: 4),
+                  Text(
+                    '${AppFormatters.formatCalendarDate(item.date)}  •  ${item.createdBy}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 5),
+                  Wrap(
+                    spacing: 6,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: item.frontSite
+                              ? AppColors.successSoft
+                              : const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'Front Site: ${item.frontSite ? "Yes" : "No"}',
+                          style: TextStyle(
+                            color: item.frontSite
+                                ? const Color(0xFF059669)
+                                : AppColors.textSecondary,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      if (item.isDefault)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 7,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Default',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
