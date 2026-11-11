@@ -709,6 +709,7 @@ class IpdAdmission {
   final String attendantRelation;
   final bool isCasualty;
   final bool isAntenatal;
+  final double outstandingDue;
 
   final PatientProfile patient;
   final AttendingDoctor doctor;
@@ -739,6 +740,7 @@ class IpdAdmission {
     required this.attendantRelation,
     required this.isCasualty,
     required this.isAntenatal,
+    this.outstandingDue = 0.0,
     required this.patient,
     required this.doctor,
     required this.vitals,
@@ -889,12 +891,41 @@ class IpdAdmission {
       json['discharge_date'] ?? json['discharged_at'],
     );
 
+    final dueVal = json['due_amount'] ??
+        json['dueAmount'] ??
+        json['balance_amount'] ??
+        json['balanceAmount'] ??
+        json['outstanding_dues'] ??
+        json['due_balance'];
+    double computedDue = JsonParsers.asDouble(dueVal);
+    if (dueVal == null &&
+        (json['net_amount'] != null || json['total_charges'] != null)) {
+      final totalBill = JsonParsers.asDouble(
+        json['net_amount'] ?? json['total_charges'],
+      );
+      final paid = JsonParsers.asDouble(
+        json['paid_amount'] ?? json['total_paid'],
+      );
+      if (totalBill > paid) computedDue = totalBill - paid;
+    }
+
     return IpdAdmission(
       id: id,
-      ipdNo: JsonParsers.asString(json['ipd_no'], fallback: id),
-      caseReferenceId: JsonParsers.asString(json['case_reference_id'] ?? json['case_id']),
+      ipdNo: JsonParsers.asString(
+        json['ipd_no'] ?? json['ipdNo'],
+        fallback: id,
+      ),
+      caseReferenceId: JsonParsers.asString(
+        json['case_reference_id'] ??
+            json['caseReferenceId'] ??
+            json['case_id'] ??
+            json['caseId'],
+      ),
       admissionDate: JsonParsers.asDateTime(
-        json['admission_date'] ?? json['date'] ?? json['createdAt'],
+        json['admission_date'] ??
+            json['admissionDate'] ??
+            json['date'] ??
+            json['createdAt'],
       ),
       dischargeDate: dischargeDt,
       dischargeStatus: rawDischargeStatus.isNotEmpty
@@ -905,21 +936,33 @@ class IpdAdmission {
       bedId: bedId,
       bedGroup: bedGroupName,
       admissionType: JsonParsers.asString(
-        json['admission_type'],
+        json['admission_type'] ?? json['admissionType'] ?? json['type'],
         fallback: 'Planned',
       ),
       provisionalDiagnosis: JsonParsers.asString(
-        json['provisional_diagnosis'] ?? json['diagnosis'] ?? json['symptoms'],
+        json['provisional_diagnosis'] ??
+            json['provisionalDiagnosis'] ??
+            json['diagnosis'] ??
+            json['symptoms'],
       ),
       department: JsonParsers.asString(
         json['department'],
         fallback: doctor.department,
       ),
-      attendantName: JsonParsers.asString(json['attendant_name']),
-      attendantPhone: JsonParsers.asString(json['attendant_phone']),
-      attendantRelation: JsonParsers.asString(json['attendant_relation']),
-      isCasualty: JsonParsers.asBool(json['casualty']),
-      isAntenatal: JsonParsers.asBool(json['is_antenatal']),
+      attendantName: JsonParsers.asString(
+        json['attendant_name'] ?? json['attendantName'],
+      ),
+      attendantPhone: JsonParsers.asString(
+        json['attendant_phone'] ?? json['attendantPhone'],
+      ),
+      attendantRelation: JsonParsers.asString(
+        json['attendant_relation'] ?? json['attendantRelation'],
+      ),
+      isCasualty: JsonParsers.asBool(json['casualty'] ?? json['is_casualty']),
+      isAntenatal: JsonParsers.asBool(
+        json['is_antenatal'] ?? json['isAntenatal'] ?? json['antenatal'],
+      ),
+      outstandingDue: computedDue,
       patient: patient,
       doctor: doctor,
       vitals: vitalsList,

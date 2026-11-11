@@ -7,15 +7,6 @@ import '../../widgets/patient_avatar.dart';
 import '../../widgets/server_config_sheet.dart';
 import '../../widgets/status_badge.dart';
 import '../beds/bed_status_screen.dart';
-import '../modules/annual_calendar_screen.dart';
-import '../modules/api_connections_screen.dart';
-import '../modules/appointments_screen.dart';
-import '../modules/blood_bank_screen.dart';
-import '../modules/pharmacy_inventory_screen.dart';
-import '../modules/staff_directory_screen.dart';
-import '../opd/opd_triage_screen.dart';
-import '../reports/reports_screen.dart';
-import '../roster/duty_roster_screen.dart';
 
 class NurseProfileScreen extends StatelessWidget {
   const NurseProfileScreen({super.key});
@@ -108,6 +99,12 @@ class NurseProfileScreen extends StatelessWidget {
     );
   }
 
+  void _navigateToShellSection(BuildContext context, int navIndex) {
+    final controller = NursePortalScope.read(context);
+    controller.setSelectedNavIndex(navIndex);
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
@@ -117,20 +114,8 @@ class NurseProfileScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: const Text('My Nurse Profile'),
+        title: const Text('Nurse Profile'),
         actions: [
-          IconButton(
-            tooltip: 'Full Live API Links',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const ApiConnectionsScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
-          ),
           IconButton(
             tooltip: 'Server Settings',
             onPressed: () => showServerConfigSheet(context),
@@ -142,7 +127,7 @@ class NurseProfileScreen extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 30),
         children: [
           SoftSurfaceCard(
             padding: const EdgeInsets.all(18),
@@ -171,7 +156,7 @@ class NurseProfileScreen extends StatelessWidget {
                       user.staffCode,
                   ].join(' • '),
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: Color(0xFF0A4D78),
                     fontSize: 13.5,
                     fontWeight: FontWeight.w700,
                   ),
@@ -185,7 +170,7 @@ class NurseProfileScreen extends StatelessWidget {
                     StatusBadge(
                       label: controller.socketConnected
                           ? 'Socket Live'
-                          : 'REST Connected',
+                          : 'Online & Ready',
                       showDot: true,
                     ),
                     if (user != null && user.department.isNotEmpty)
@@ -228,32 +213,44 @@ class NurseProfileScreen extends StatelessWidget {
             child: Column(
               children: [
                 _MenuRow(
-                  icon: Icons.hub_rounded,
-                  title: 'Full Live API Links & Status',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ApiConnectionsScreen(),
-                      ),
-                    );
-                  },
+                  icon: Icons.dashboard_rounded,
+                  title: 'Dashboard',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.dashboard,
+                  ),
                 ),
                 const Divider(indent: 54),
                 _MenuRow(
-                  icon: Icons.schedule_rounded,
-                  title: 'My Duty Roster & Shifts',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const DutyRosterScreen(),
-                      ),
-                    );
-                  },
+                  icon: Icons.groups_rounded,
+                  title: 'Patient Directory',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.patients,
+                  ),
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.medical_information_rounded,
+                  title: 'OPD - Out Patient',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.opd,
+                  ),
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.hotel_rounded,
+                  title: 'IPD - In Patient',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.ipd,
+                  ),
                 ),
                 const Divider(indent: 54),
                 _MenuRow(
                   icon: Icons.bed_rounded,
-                  title: 'Ward & Bed Occupancy',
+                  title: 'Ward Bed Status',
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -264,87 +261,30 @@ class NurseProfileScreen extends StatelessWidget {
                 ),
                 const Divider(indent: 54),
                 _MenuRow(
-                  icon: Icons.medical_information_rounded,
-                  title: 'OPD Triage Queue',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const OpdTriageScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(indent: 54),
-                _MenuRow(
-                  icon: Icons.event_available_rounded,
-                  title: 'Hospital Appointments',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AppointmentsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(indent: 54),
-                _MenuRow(
-                  icon: Icons.badge_rounded,
-                  title: 'Doctors & Staff Directory',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const StaffDirectoryScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(indent: 54),
-                _MenuRow(
-                  icon: Icons.medication_liquid_rounded,
-                  title: 'Pharmacy & Ward Supplies',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const PharmacyInventoryScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(indent: 54),
-                _MenuRow(
-                  icon: Icons.biotech_rounded,
-                  title: 'Diagnostic & Lab Reports',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ReportsScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const Divider(indent: 54),
-                _MenuRow(
                   icon: Icons.water_drop_rounded,
                   title: 'Blood Bank Status',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const BloodBankScreen(),
-                      ),
-                    );
-                  },
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.bloodBank,
+                  ),
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.schedule_rounded,
+                  title: 'Duty Roster',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.dutyRoster,
+                  ),
                 ),
                 const Divider(indent: 54),
                 _MenuRow(
                   icon: Icons.calendar_month_rounded,
-                  title: 'Annual Holiday Calendar',
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const AnnualCalendarScreen(),
-                      ),
-                    );
-                  },
+                  title: 'Annual Calendar',
+                  onTap: () => _navigateToShellSection(
+                    context,
+                    NurseNavIndex.annualCalendar,
+                  ),
                 ),
                 const Divider(indent: 54),
                 _MenuRow(
@@ -376,7 +316,7 @@ class NurseProfileScreen extends StatelessWidget {
                 builder: (ctx) => AlertDialog(
                   title: const Text('Logout from Nurse Portal?'),
                   content: const Text(
-                    'Your active ward session and live Socket.IO clinical alerts will be disconnected.',
+                    'Your active ward session and live Socket.IO clinical stream will be disconnected.',
                   ),
                   actions: [
                     TextButton(
@@ -395,6 +335,9 @@ class NurseProfileScreen extends StatelessWidget {
                 ),
               );
               if (confirm == true) {
+                if (context.mounted) {
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                }
                 await controller.logout();
               }
             },
@@ -424,7 +367,7 @@ class _ProfileMetaRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
         children: [
-          Icon(icon, size: 17, color: AppColors.primary),
+          Icon(icon, size: 17, color: const Color(0xFF0A4D78)),
           const SizedBox(width: 10),
           SizedBox(
             width: 72,
@@ -477,7 +420,7 @@ class _MenuRow extends StatelessWidget {
           color: AppColors.skySurface,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: AppColors.primary, size: 20),
+        child: Icon(icon, color: const Color(0xFF0A4D78), size: 20),
       ),
       title: Text(
         title,

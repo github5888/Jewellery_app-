@@ -8,18 +8,34 @@ import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
 import '../core/network/socket_service.dart';
 import '../models/bed_models.dart';
-import '../models/clinical_report_model.dart';
 import '../models/dashboard_data.dart';
 import '../models/duty_roster_model.dart';
 import '../models/hospital_modules_models.dart';
 import '../models/ipd_models.dart';
 import '../models/nurse_user.dart';
-import '../models/nursing_task_model.dart';
 import '../models/opd_models.dart';
 import '../models/patient_directory_model.dart';
 import '../services/nurse_api_service.dart';
 
 enum AuthStage { initializing, unauthenticated, authenticated }
+
+/// Navigation indices matching the exact 7 Nurse Sidebar items on `https://hospital.hrpocket.in` (image-5):
+/// 0: Dashboard
+/// 1: Patient (Patient Directory)
+/// 2: OPD - Out Patient
+/// 3: IPD - In Patient
+/// 4: Blood Bank
+/// 5: Duty Roster
+/// 6: Annual Calendar
+class NurseNavIndex {
+  static const int dashboard = 0;
+  static const int patients = 1;
+  static const int opd = 2;
+  static const int ipd = 3;
+  static const int bloodBank = 4;
+  static const int dutyRoster = 5;
+  static const int annualCalendar = 6;
+}
 
 class NursePortalController extends ChangeNotifier {
   late final ApiClient _apiClient;
@@ -38,7 +54,7 @@ class NursePortalController extends ChangeNotifier {
     name: 'Smart Super Speciality Hospital',
   );
 
-  // Live clinical state (100% populated from backend APIs — zero dummy data)
+  // Live website-synced state (zero dummy data)
   NurseDashboardData? _dashboard;
   List<IpdAdmission> _admittedPatients = const [];
   List<IpdAdmission> _dischargedPatients = const [];
@@ -46,12 +62,10 @@ class NursePortalController extends ChangeNotifier {
   List<OpdVisitRecord> _opdQueue = const [];
   List<HospitalBed> _beds = const [];
   List<WardBedGroup> _bedGroups = const [];
-  List<DutyShiftAssignment> _myShifts = const [];
   List<DutyShiftAssignment> _allRosterShifts = const [];
   List<MedicationPrescription> _wardPrescriptions = const [];
-  List<ClinicalReportRecord> _labReports = const [];
-  List<ClinicalReportRecord> _radiologyReports = const [];
-  List<HospitalAppointmentItem> _appointments = const [];
+  List<BloodBankGroupItem> _bloodBankGroups = const [];
+  List<HospitalHolidayItem> _holidays = const [];
   List<ServerNotificationItem> _serverNotifications = const [];
   List<AbhaScanCheckinItem> _abhaQueue = const [];
 
@@ -60,16 +74,15 @@ class NursePortalController extends ChangeNotifier {
   bool _hasLoadedOpd = false;
 
   bool _isLoadingWorkspace = false;
-  bool _isLoadingReports = false;
   String? _workspaceError;
-  String? _reportsError;
 
   bool _socketConnected = false;
   final List<RealtimeClinicalEvent> _liveAlerts = <RealtimeClinicalEvent>[];
   int _unreadAlertsCount = 0;
   RealtimeClinicalEvent? _latestBannerEvent;
 
-  int _selectedNavIndex = 0;
+  int _selectedNavIndex = NurseNavIndex.dashboard;
+  bool _ipdShowDischarged = false;
 
   NursePortalController() {
     _apiClient = ApiClient(
@@ -110,12 +123,10 @@ class NursePortalController extends ChangeNotifier {
   List<OpdVisitRecord> get opdQueue => _opdQueue;
   List<HospitalBed> get beds => _beds;
   List<WardBedGroup> get bedGroups => _bedGroups;
-  List<DutyShiftAssignment> get myShifts => _myShifts;
   List<DutyShiftAssignment> get allRosterShifts => _allRosterShifts;
   List<MedicationPrescription> get wardPrescriptions => _wardPrescriptions;
-  List<ClinicalReportRecord> get labReports => _labReports;
-  List<ClinicalReportRecord> get radiologyReports => _radiologyReports;
-  List<HospitalAppointmentItem> get appointments => _appointments;
+  List<BloodBankGroupItem> get bloodBankGroups => _bloodBankGroups;
+  List<HospitalHolidayItem> get holidays => _holidays;
   List<ServerNotificationItem> get serverNotifications => _serverNotifications;
   List<AbhaScanCheckinItem> get abhaQueue => _abhaQueue;
 
@@ -123,9 +134,7 @@ class NursePortalController extends ChangeNotifier {
       _abhaQueue.where((item) => item.isPending).length;
 
   bool get isLoadingWorkspace => _isLoadingWorkspace;
-  bool get isLoadingReports => _isLoadingReports;
   String? get workspaceError => _workspaceError;
-  String? get reportsError => _reportsError;
 
   bool get socketConnected => _socketConnected;
   List<RealtimeClinicalEvent> get liveAlerts => List.unmodifiable(_liveAlerts);
@@ -135,10 +144,29 @@ class NursePortalController extends ChangeNotifier {
   RealtimeClinicalEvent? get latestBannerEvent => _latestBannerEvent;
 
   int get selectedNavIndex => _selectedNavIndex;
+  bool get ipdShowDischarged => _ipdShowDischarged;
 
   void setSelectedNavIndex(int index) {
+    if (index == NurseNavIndex.ipd) {
+      _ipdShowDischarged = false;
+    }
     if (_selectedNavIndex != index) {
       _selectedNavIndex = index;
+      notifyListeners();
+    } else {
+      notifyListeners();
+    }
+  }
+
+  void openIpdSection({bool showDischarged = false}) {
+    _ipdShowDischarged = showDischarged;
+    _selectedNavIndex = NurseNavIndex.ipd;
+    notifyListeners();
+  }
+
+  void setIpdShowDischarged(bool value) {
+    if (_ipdShowDischarged != value) {
+      _ipdShowDischarged = value;
       notifyListeners();
     }
   }
@@ -172,58 +200,84 @@ class NursePortalController extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Exact Website-Matched Metrics (matching Screenshot 720 & live collection lengths)
+  // ---------------------------------------------------------------------------
+  // Exact Website-Matched Dashboard Metrics (image-4, image-5, image-8)
+  // ---------------------------------------------------------------------------
+
+  /// Card 1: Total Patients (`9` — active patients in Patient Directory)
   int get totalPatientsCount {
-    if (_hasLoadedPatients) return _patientDirectory.length;
+    if (_hasLoadedPatients) {
+      return _patientDirectory.where((p) => !p.isDisabled).length;
+    }
     return _dashboard?.totalPatients ?? 0;
   }
 
+  /// Card 2: Currently Admitted (`1` — active admitted in-patients in wards)
   int get activePatientsCount {
     if (_hasLoadedIpd) return _admittedPatients.length;
     return _dashboard?.currentlyAdmitted ?? 0;
   }
 
+  /// Card 3: OPD Patients (`12` — outpatient clinic consultations)
   int get opdPatientsCount {
     if (_hasLoadedOpd) return _opdQueue.length;
     return _dashboard?.opdPatients ?? 0;
   }
 
+  /// Card 4: Discharged Patients (`5` — completed hospital discharges)
   int get dischargedPatientsCount {
     if (_hasLoadedIpd) return _dischargedPatients.length;
     return _dashboard?.dischargedPatients ?? 0;
   }
 
+  /// Card 7: Pending Vitals (`1` — admitted patients due for vitals today)
   int get pendingVitalsCount {
+    if (_dashboard != null && _dashboard!.pendingVitalsCount > 0) {
+      return _dashboard!.pendingVitalsCount;
+    }
     if (_hasLoadedIpd) {
       final now = DateTime.now();
-      final dueToday = _admittedPatients.where((ipd) {
+      return _admittedPatients.where((ipd) {
         final lv = ipd.latestVital;
         if (lv == null || lv.date == null) return true;
         return lv.date!.year != now.year ||
             lv.date!.month != now.month ||
             lv.date!.day != now.day;
       }).length;
-      if (_dashboard != null && _dashboard!.pendingVitalsCount > dueToday) {
-        return _dashboard!.pendingVitalsCount;
-      }
-      return dueToday;
     }
-    return _dashboard?.pendingVitalsCount ?? 0;
+    return 0;
   }
 
+  /// Card 6: Medications Due (`0` — prescriptions requiring administration)
   int get medicationsDueCount {
-    final pendingRx = _wardPrescriptions.where((rx) => rx.isPending).length;
-    if (pendingRx > 0) return pendingRx;
-    return _dashboard?.medicationsDueCount ?? 0;
+    if (_dashboard != null && _dashboard!.medicationsDueCount > 0) {
+      return _dashboard!.medicationsDueCount;
+    }
+    return _wardPrescriptions.where((rx) => rx.isPending).length;
   }
 
+  /// Card 5: Pending Nursing Tasks (`2` — care tasks & nurse notes due)
   int get pendingNursingTasksCount {
     if (_dashboard != null && _dashboard!.pendingNursingTasksCount > 0) {
       return _dashboard!.pendingNursingTasksCount;
     }
-    return pendingNursingTasks.length;
+    if (_hasLoadedIpd) {
+      final now = DateTime.now();
+      final missingNotesToday = _admittedPatients.where((ipd) {
+        return !ipd.nurseNotes.any(
+          (n) =>
+              n.date != null &&
+              n.date!.year == now.year &&
+              n.date!.month == now.month &&
+              n.date!.day == now.day,
+        );
+      }).length;
+      return pendingVitalsCount + missingNotesToday + medicationsDueCount;
+    }
+    return 0;
   }
 
+  /// Card 8: Ward Bed Occupancy (`1 / 2`, `50% Full`, `1 Available Beds`)
   int get totalBedsCount {
     if (_beds.isNotEmpty) return _beds.length;
     return _dashboard?.totalBeds ?? 0;
@@ -251,295 +305,75 @@ class NursePortalController extends ChangeNotifier {
 
   int get bedOccupancyPercent => (bedOccupancyRatio * 100).round();
 
-  /// Synthesizes real clinical tasks from live ward & OPD queue state (zero fake tasks).
-  List<NursingTaskItem> get pendingNursingTasks {
-    final tasks = <NursingTaskItem>[];
-    final seenVitalsIpdIds = <String>{};
-
-    // 1. Pending IPD Vitals from `/api/dashboard` pendingVitalsRecords
-    if (_dashboard != null) {
-      for (final pv in _dashboard!.pendingVitalsRecords) {
-        if (pv.ipdId.isNotEmpty) {
-          seenVitalsIpdIds.add(pv.ipdId);
-        }
-        final loc = [
-          if (pv.ward.isNotEmpty) pv.ward,
-          if (pv.bed.isNotEmpty) pv.bed,
-        ].join(' / ');
-        tasks.add(
-          NursingTaskItem(
-            id: 'vital-due-${pv.ipdId.isNotEmpty ? pv.ipdId : pv.patientUniqueId}',
-            kind: NursingTaskKind.ipdVitals,
-            title: 'Record Bedside Vitals',
-            subtitle: 'Hourly / shift vitals pending',
-            patientName: pv.patientName,
-            patientUniqueId: pv.patientUniqueId,
-            locationLabel: loc,
-            isUrgent: true,
-            isCompleted: false,
-            ipdId: pv.ipdId.isNotEmpty ? pv.ipdId : null,
-          ),
-        );
-      }
-    }
-
-    // 2. Admitted IPD patients without vitals recorded today + shift care note check
-    final now = DateTime.now();
+  double get ipdOutstandingDues {
+    double sum = 0;
     for (final ipd in _admittedPatients) {
-      if (!seenVitalsIpdIds.contains(ipd.id)) {
-        final lv = ipd.latestVital;
-        final recordedToday = lv?.date != null &&
-            lv!.date!.year == now.year &&
-            lv.date!.month == now.month &&
-            lv.date!.day == now.day;
+      sum += ipd.outstandingDue;
+    }
+    return sum;
+  }
 
-        if (!recordedToday) {
-          tasks.add(
-            NursingTaskItem(
-              id: 'ipd-vital-${ipd.id}',
-              kind: NursingTaskKind.ipdVitals,
-              title: 'Monitor BP, SpO2 & Temp',
-              subtitle: lv == null
-                  ? 'Initial admission vitals required'
-                  : 'Due for today\'s shift vitals',
+  int get ipdAntenatalCount =>
+      _admittedPatients.where((p) => p.isAntenatal).length;
+
+  /// Synthesizes today's Recent Patient Clinical Activity if `/api/dashboard` omits `recentActivity`
+  /// while vitals or nurse notes were recorded today; otherwise returns empty list (`[]`)
+  /// so Dashboard shows exact website text `"No recent vitals or nursing notes recorded today yet."`
+  List<ClinicalActivityItem> get todayClinicalActivity {
+    if (_dashboard != null && _dashboard!.recentActivity.isNotEmpty) {
+      return _dashboard!.recentActivity;
+    }
+    final now = DateTime.now();
+    final todayItems = <ClinicalActivityItem>[];
+    for (final ipd in _admittedPatients) {
+      for (final v in ipd.vitals) {
+        if (v.date != null &&
+            v.date!.year == now.year &&
+            v.date!.month == now.month &&
+            v.date!.day == now.day) {
+          todayItems.add(
+            ClinicalActivityItem(
+              id: v.id,
+              type: 'vitals',
+              title: 'Vitals Recorded • ${ipd.patient.patientName}',
+              description: [
+                if (v.bp.isNotEmpty) 'BP ${v.bp}',
+                if (v.pulse.isNotEmpty) 'Pulse ${v.pulse}',
+                if (v.temperature.isNotEmpty) 'Temp ${v.temperature}°F',
+                if (v.spo2.isNotEmpty) 'SpO2 ${v.spo2}%',
+              ].join(' • '),
               patientName: ipd.patient.patientName,
-              patientUniqueId: ipd.patient.patientUniqueId,
-              locationLabel: ipd.wardAndBedLabel,
-              isUrgent: ipd.isCasualty || ipd.clinicalStatusLabel == 'Critical',
-              isCompleted: false,
-              ipdId: ipd.id,
+              nurseName: v.recordedBy,
+              timestamp: v.date,
             ),
           );
         }
       }
-
-      // Shift nurse progress note due today (matches website `Care tasks & nurse notes due`)
-      final hasNoteToday = ipd.nurseNotes.any(
-        (n) =>
-            n.date != null &&
+      for (final n in ipd.nurseNotes) {
+        if (n.date != null &&
             n.date!.year == now.year &&
             n.date!.month == now.month &&
-            n.date!.day == now.day,
-      );
-      if (!hasNoteToday) {
-        tasks.add(
-          NursingTaskItem(
-            id: 'ipd-note-due-${ipd.id}',
-            kind: NursingTaskKind.nursingCareNote,
-            title: 'Shift Nursing Progress Note',
-            subtitle: 'Daily bedside shift observation & handover note due',
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            locationLabel: ipd.wardAndBedLabel,
-            isUrgent: false,
-            isCompleted: false,
-            ipdId: ipd.id,
-          ),
-        );
+            n.date!.day == now.day) {
+          todayItems.add(
+            ClinicalActivityItem(
+              id: n.id,
+              type: 'note',
+              title: 'Nursing Note • ${ipd.patient.patientName}',
+              description: n.note,
+              patientName: ipd.patient.patientName,
+              nurseName: n.nurseName,
+              timestamp: n.date,
+            ),
+          );
+        }
       }
     }
-
-    // 3. Pending MAR Medication Doses
-    for (final rx in _wardPrescriptions) {
-      if (!rx.isPending) continue;
-      final doseInfo = [
-        if (rx.dose.isNotEmpty) rx.dose,
-        if (rx.frequency.isNotEmpty) rx.frequency,
-        if (rx.instruction.isNotEmpty) rx.instruction,
-      ].join(' • ');
-      tasks.add(
-        NursingTaskItem(
-          id: 'mar-${rx.ipdId}-${rx.id}',
-          kind: NursingTaskKind.medicationDose,
-          title: 'Administer ${rx.medicineName}',
-          subtitle: doseInfo.isNotEmpty ? doseInfo : 'Scheduled MAR medication',
-          patientName: rx.patientName,
-          patientUniqueId: rx.patientUniqueId,
-          locationLabel: rx.bedLabel,
-          isUrgent: rx.frequency.toUpperCase().contains('STAT') ||
-              rx.instruction.toLowerCase().contains('iv'),
-          isCompleted: false,
-          timestamp: rx.orderedDate,
-          ipdId: rx.ipdId.isNotEmpty ? rx.ipdId : null,
-          prescriptionId: rx.id,
-        ),
-      );
-    }
-
-    // 4. OPD Waiting Queue Patients Pending Triage Vitals
-    for (final opd in _opdQueue) {
-      final st = opd.status.toLowerCase();
-      if ((st.contains('wait') || st.contains('sched')) &&
-          !opd.hasVitalsRecorded) {
-        tasks.add(
-          NursingTaskItem(
-            id: 'opd-triage-${opd.id}',
-            kind: NursingTaskKind.opdTriageVitals,
-            title: 'OPD Triage Vitals (${opd.opdNo})',
-            subtitle: 'Pre-consultation vitals for ${opd.doctorName}',
-            patientName: opd.patient.patientName,
-            patientUniqueId: opd.patient.patientUniqueId,
-            locationLabel: 'OPD Waiting Queue',
-            isUrgent: false,
-            isCompleted: false,
-            timestamp: opd.appointmentDate,
-            opdId: opd.id,
-          ),
-        );
-      }
-    }
-
-    // 5. Doctor Round Instructions from admitted patients
-    for (final ipd in _admittedPatients) {
-      for (final ins in ipd.consultantRegister) {
-        if (ins.instruction.isEmpty) continue;
-        tasks.add(
-          NursingTaskItem(
-            id: 'round-${ipd.id}-${ins.id}',
-            kind: NursingTaskKind.doctorInstruction,
-            title: ins.instruction,
-            subtitle: ins.doctorName.isNotEmpty
-                ? 'Round order by ${ins.doctorName}'
-                : 'Consultant round instruction',
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            locationLabel: ipd.wardAndBedLabel,
-            isUrgent: false,
-            isCompleted: false,
-            timestamp: ins.date,
-            ipdId: ipd.id,
-          ),
-        );
-      }
-    }
-
-    return tasks;
-  }
-
-  /// Completed nursing activities from real recorded vitals, given MAR doses, and shift notes.
-  List<NursingTaskItem> get completedNursingTasks {
-    final completed = <NursingTaskItem>[];
-
-    for (final rx in _wardPrescriptions) {
-      if (!rx.isGiven) continue;
-      completed.add(
-        NursingTaskItem(
-          id: 'done-mar-${rx.ipdId}-${rx.id}',
-          kind: NursingTaskKind.medicationDose,
-          title: '${rx.medicineName} (${rx.status})',
-          subtitle: rx.administeredBy.isNotEmpty
-              ? 'Administered by ${rx.administeredBy}'
-              : 'Dose logged in MAR',
-          patientName: rx.patientName,
-          patientUniqueId: rx.patientUniqueId,
-          locationLabel: rx.bedLabel,
-          isUrgent: false,
-          isCompleted: true,
-          timestamp: rx.administeredAt,
-          ipdId: rx.ipdId.isNotEmpty ? rx.ipdId : null,
-          prescriptionId: rx.id,
-        ),
-      );
-    }
-
-    for (final ipd in _admittedPatients) {
-      final lv = ipd.latestVital;
-      if (lv != null) {
-        final metrics = [
-          if (lv.bp.isNotEmpty) 'BP ${lv.bp}',
-          if (lv.pulse.isNotEmpty) 'HR ${lv.pulse} bpm',
-          if (lv.spo2.isNotEmpty) 'SpO2 ${lv.spo2}%',
-        ].join(' • ');
-        completed.add(
-          NursingTaskItem(
-            id: 'done-vital-${ipd.id}-${lv.id}',
-            kind: NursingTaskKind.ipdVitals,
-            title: 'Vitals Recorded',
-            subtitle: metrics.isNotEmpty ? metrics : 'Bedside vitals saved',
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            locationLabel: ipd.wardAndBedLabel,
-            isUrgent: false,
-            isCompleted: true,
-            timestamp: lv.date,
-            ipdId: ipd.id,
-          ),
-        );
-      }
-
-      for (final note in ipd.nurseNotes) {
-        completed.add(
-          NursingTaskItem(
-            id: 'done-note-${ipd.id}-${note.id}',
-            kind: NursingTaskKind.nursingCareNote,
-            title: note.note,
-            subtitle: 'Care note by ${note.nurseName}',
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            locationLabel: ipd.wardAndBedLabel,
-            isUrgent: false,
-            isCompleted: true,
-            timestamp: note.date,
-            ipdId: ipd.id,
-          ),
-        );
-      }
-    }
-
-    completed.sort((a, b) {
+    todayItems.sort((a, b) {
       final da = a.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0);
       final db = b.timestamp ?? DateTime.fromMillisecondsSinceEpoch(0);
       return db.compareTo(da);
     });
-    return completed;
-  }
-
-  /// Other clinical documents synthesized from live IPD investigations & prescriptions.
-  List<ClinicalReportRecord> get otherClinicalDocuments {
-    final docs = <ClinicalReportRecord>[];
-    for (final ipd in _admittedPatients) {
-      for (final inv in ipd.investigations) {
-        docs.add(
-          ClinicalReportRecord(
-            id: inv.id,
-            billNo: ipd.ipdNo,
-            title: inv.testName,
-            category: ClinicalReportCategory.others,
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            doctorName: ipd.doctor.displayName,
-            date: inv.orderedAt ?? ipd.admissionDate,
-            status: inv.status,
-            resultSummary: inv.resultSummary,
-            reportPdf: inv.reportPdf,
-          ),
-        );
-      }
-      for (final rx in ipd.prescriptions) {
-        docs.add(
-          ClinicalReportRecord(
-            id: rx.id,
-            billNo:
-                rx.prescriptionNo.isNotEmpty ? rx.prescriptionNo : ipd.ipdNo,
-            title: 'Prescription • ${rx.medicineName}',
-            category: ClinicalReportCategory.others,
-            patientName: ipd.patient.patientName,
-            patientUniqueId: ipd.patient.patientUniqueId,
-            doctorName:
-                rx.orderedBy.isNotEmpty ? rx.orderedBy : ipd.doctor.displayName,
-            date: rx.orderedDate ?? ipd.admissionDate,
-            status: rx.status,
-            resultSummary: [
-              if (rx.dose.isNotEmpty) rx.dose,
-              if (rx.frequency.isNotEmpty) rx.frequency,
-              if (rx.duration.isNotEmpty) rx.duration,
-              if (rx.instruction.isNotEmpty) rx.instruction,
-            ].join(' • '),
-          ),
-        );
-      }
-    }
-    return docs;
+    return todayItems;
   }
 
   // ---------------------------------------------------------------------------
@@ -652,7 +486,7 @@ class NursePortalController extends ChangeNotifier {
       );
     }
 
-    _selectedNavIndex = 0;
+    _selectedNavIndex = NurseNavIndex.dashboard;
     _authStage = AuthStage.authenticated;
     _connectRealtime(result.token);
     notifyListeners();
@@ -672,12 +506,10 @@ class NursePortalController extends ChangeNotifier {
     _opdQueue = const [];
     _beds = const [];
     _bedGroups = const [];
-    _myShifts = const [];
     _allRosterShifts = const [];
     _wardPrescriptions = const [];
-    _labReports = const [];
-    _radiologyReports = const [];
-    _appointments = const [];
+    _bloodBankGroups = const [];
+    _holidays = const [];
     _serverNotifications = const [];
     _abhaQueue = const [];
     _hasLoadedIpd = false;
@@ -687,7 +519,7 @@ class NursePortalController extends ChangeNotifier {
     _unreadAlertsCount = 0;
     _latestBannerEvent = null;
     _workspaceError = null;
-    _selectedNavIndex = 0;
+    _selectedNavIndex = NurseNavIndex.dashboard;
     _authStage = AuthStage.unauthenticated;
     notifyListeners();
   }
@@ -713,7 +545,7 @@ class NursePortalController extends ChangeNotifier {
   }
 
   // ---------------------------------------------------------------------------
-  // Live Workspace Data Synchronization (100% Website Parity)
+  // Live Workspace Synchronization (100% Website Parity)
   // ---------------------------------------------------------------------------
 
   Future<void> refreshWorkspace({bool silent = false}) async {
@@ -775,9 +607,13 @@ class NursePortalController extends ChangeNotifier {
         .fetchDutyRoster()
         .then((v) => v, onError: (_) => _allRosterShifts);
 
-    final appointmentsFuture = api
-        .fetchAppointments()
-        .then((v) => v, onError: (_) => _appointments);
+    final bloodBankFuture = api
+        .fetchBloodBank()
+        .then((v) => v, onError: (_) => _bloodBankGroups);
+
+    final holidaysFuture = api
+        .fetchHolidays()
+        .then((v) => v, onError: (_) => _holidays);
 
     final notificationsFuture = api
         .fetchNotifications()
@@ -795,7 +631,8 @@ class NursePortalController extends ChangeNotifier {
       bedsFuture,
       groupsFuture,
       allRosterFuture,
-      appointmentsFuture,
+      bloodBankFuture,
+      holidaysFuture,
       notificationsFuture,
       abhaFuture,
     ]);
@@ -807,20 +644,10 @@ class NursePortalController extends ChangeNotifier {
     final rawBeds = results[4] as List<HospitalBed>;
     _bedGroups = results[5] as List<WardBedGroup>;
     _allRosterShifts = results[6] as List<DutyShiftAssignment>;
-    _appointments = results[7] as List<HospitalAppointmentItem>;
-    _serverNotifications = results[8] as List<ServerNotificationItem>;
-    _abhaQueue = results[9] as List<AbhaScanCheckinItem>;
-
-    // Filter myShifts from allRosterShifts for logged-in nurse
-    final uid = _currentUser?.id ?? '';
-    final ucode = _currentUser?.staffCode.toLowerCase() ?? '';
-    final uname = _currentUser?.fullName.toLowerCase() ?? '';
-    _myShifts = _allRosterShifts.where((s) {
-      if (uid.isNotEmpty && s.staffId == uid) return true;
-      if (ucode.isNotEmpty && s.staffCode.toLowerCase() == ucode) return true;
-      if (uname.isNotEmpty && s.staffName.toLowerCase() == uname) return true;
-      return false;
-    }).toList();
+    _bloodBankGroups = results[7] as List<BloodBankGroupItem>;
+    _holidays = results[8] as List<HospitalHolidayItem>;
+    _serverNotifications = results[9] as List<ServerNotificationItem>;
+    _abhaQueue = results[10] as List<AbhaScanCheckinItem>;
 
     final basicAdmitted = allIpdList.where((p) => !p.isDischarged).toList();
     _dischargedPatients = allIpdList.where((p) => p.isDischarged).toList();
@@ -845,8 +672,7 @@ class NursePortalController extends ChangeNotifier {
       _admittedPatients = const [];
     }
 
-    // Cross-enrich beds with active IPD admissions so occupancy & currentPatientName
-    // always match admitted ward patients 100% (just like the live web portal).
+    // Cross-enrich beds with active IPD admissions so occupancy & currentPatientName match 100%
     _beds = rawBeds.map((b) {
       final occupant = _admittedPatients.where((ipd) {
         if (b.id.isNotEmpty && ipd.bedId.isNotEmpty && b.id == ipd.bedId) {
@@ -876,7 +702,7 @@ class NursePortalController extends ChangeNotifier {
       );
     }).toList();
 
-    // Aggregate all real ward prescriptions across admitted patients
+    // Aggregate real ward prescriptions across admitted patients
     final allRx = <MedicationPrescription>[];
     for (final ipd in _admittedPatients) {
       for (final rx in ipd.prescriptions) {
@@ -905,26 +731,6 @@ class NursePortalController extends ChangeNotifier {
 
     _isLoadingWorkspace = false;
     notifyListeners();
-  }
-
-  Future<void> refreshClinicalReports() async {
-    _isLoadingReports = true;
-    _reportsError = null;
-    notifyListeners();
-
-    try {
-      final results = await Future.wait<List<ClinicalReportRecord>>([
-        api.fetchPathologyReports(),
-        api.fetchRadiologyReports(),
-      ]);
-      _labReports = results[0];
-      _radiologyReports = results[1];
-    } catch (e) {
-      _reportsError = e.toString();
-    } finally {
-      _isLoadingReports = false;
-      notifyListeners();
-    }
   }
 }
 

@@ -1,129 +1,264 @@
 import '../core/utils/formatters.dart';
 import '../core/utils/json_parsers.dart';
 
+/// Blood Bank Group Stock (`GET /api/blood-bank` — matches Website `/admin/bloodbankstatus` image-9)
 class BloodBankGroupItem {
   final String id;
   final String bloodGroup;
-  final String componentType;
   final int availableBags;
-  final String status;
 
   const BloodBankGroupItem({
     required this.id,
     required this.bloodGroup,
-    required this.componentType,
     required this.availableBags,
-    required this.status,
   });
+
+  static const List<String> standardGroups = [
+    'A+',
+    'A-',
+    'B+',
+    'B-',
+    'AB+',
+    'AB-',
+    'O+',
+    'O-',
+  ];
 
   factory BloodBankGroupItem.fromJson(Map<String, dynamic> json) {
     final bags = JsonParsers.asInt(
       json['available_bags'] ??
+          json['availableBags'] ??
+          json['total_bags'] ??
+          json['totalBags'] ??
+          json['available_units'] ??
+          json['availableUnits'] ??
           json['bags'] ??
+          json['units'] ??
           json['qty'] ??
           json['quantity'] ??
-          json['units'] ??
           json['count'] ??
-          json['available'],
+          json['available'] ??
+          json['stock'] ??
+          json['in_stock'],
+    );
+    final rawGroup = JsonParsers.asString(
+      json['blood_group'] ??
+          json['bloodGroup'] ??
+          json['group'] ??
+          json['blood_type'] ??
+          json['bloodType'] ??
+          json['name'] ??
+          (standardGroups.contains(JsonParsers.asString(json['_id']))
+              ? json['_id']
+              : null),
     );
     return BloodBankGroupItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
-      bloodGroup: JsonParsers.asString(
-        json['blood_group'] ?? json['group'] ?? json['name'],
-        fallback: 'Unknown',
-      ),
-      componentType: JsonParsers.asString(
-        json['component'] ?? json['type'] ?? json['bag_type'],
-        fallback: 'Blood / PRBC',
-      ),
+      id: JsonParsers.asId(json['_id'] ?? json['id'] ?? rawGroup),
+      bloodGroup: rawGroup,
       availableBags: bags,
-      status: JsonParsers.asString(
-        json['status'],
-        fallback: bags > 0 ? 'Available' : '0 Bags',
-      ),
     );
   }
 
-  /// Parses any real backend `/api/blood-bank` response shape:
-  /// 1. List of group summaries (`[{ blood_group: 'A+', available_bags: 4 }]`)
-  /// 2. List of individual blood bag records (`[{ blood_group: 'A+', bag_no: '101', status: 'Available' }]`)
-  /// 3. Key-value summary map (`{ "A+": 4, "B+": 2, ... }`)
+  /// Parses any backend Blood Bank payload into the 8 standard blood groups (`A+`..`O-`)
+  /// without ever mistaking `donors` or `issues` arrays for blood group summaries.
   static List<BloodBankGroupItem> parseFlexible(dynamic raw) {
-    final list = JsonParsers.extractList(raw);
-    if (list.isNotEmpty) {
-      // Check if items represent individual bags (have bag_no/donor and no aggregate count field)
-      final looksLikeIndividualBags = list.any(
+    List<Map<String, dynamic>>? candidateList;
+
+    if (raw is List) {
+      candidateList = JsonParsers.asMapList(raw);
+    } else if (raw is Map) {
+      final root = JsonParsers.asMap(raw);
+      final inner = root['data'] is Map
+          ? JsonParsers.asMap(root['data'])
+          : <String, dynamic>{};
+
+      // 1. Check dedicated stock/group list keys (strictly excluding `donors` and `issues`)
+      const stockListKeys = <String>[
+        'bloodGroups',
+        'blood_groups',
+        'bloodStatus',
+        'blood_status',
+        'groups',
+        'stock',
+        'stocks',
+        'summary',
+        'inventory',
+        'bags',
+        'units',
+        'records',
+        'items',
+      ];
+      for (final map in [root, inner]) {
+        if (candidateList != null) break;
+        for (final k in stockListKeys) {
+          if (map[k] is List) {
+            candidateList = JsonParsers.asMapList(map[k]);
+            break;
+          }
+        }
+      }
+      if (candidateList == null && root['data'] is List) {
+        candidateList = JsonParsers.asMapList(root['data']);
+      }
+
+      // 2. Check object-keyed map shape (`{ "A+": 12, "A-": 4, ... }`)
+      if (candidateList == null) {
+        for (final map in [
+          inner,
+          if (inner['stock'] is Map) JsonParsers.asMap(inner['stock']),
+          if (inner['groups'] is Map) JsonParsers.asMap(inner['groups']),
+          if (inner['bloodGroups'] is Map)
+            JsonParsers.asMap(inner['bloodGroups']),
+          if (inner['status'] is Map) JsonParsers.asMap(inner['status']),
+          root,
+        ]) {
+          final found = <BloodBankGroupItem>[];
+          for (final grp in standardGroups) {
+            if (map.containsKey(grp)) {
+              final v = map[grp];
+              final cnt = v is Map
+                  ? JsonParsers.asInt(
+                      v['availableBags'] ??
+                          v['available_bags'] ??
+                          v['available'] ??
+                          v['bags'] ??
+                          v['count'],
+                    )
+                  : JsonParsers.asInt(v);
+              found.add(
+                BloodBankGroupItem(
+                  id: grp,
+                  bloodGroup: grp,
+                  availableBags: cnt,
+                ),
+              );
+            }
+          }
+          if (found.isNotEmpty) return _orderByStandardGroups(found);
+        }
+      }
+    }
+
+    if (candidateList != null && candidateList.isNotEmpty) {
+      // Check if items are individual BloodBag records (each row is 1 bag)
+      final looksLikeIndividualBags = candidateList.any(
         (m) =>
-            (m.containsKey('bag_no') || m.containsKey('donor')) &&
+            (m.containsKey('bag_no') ||
+                m.containsKey('bagNo') ||
+                m.containsKey('donor') ||
+                m.containsKey('volume')) &&
             !m.containsKey('available_bags') &&
+            !m.containsKey('availableBags') &&
             !m.containsKey('bags') &&
             !m.containsKey('count'),
       );
+
       if (looksLikeIndividualBags) {
-        final grouped = <String, int>{};
-        for (final bag in list) {
+        final counts = <String, int>{
+          for (final g in standardGroups) g: 0,
+        };
+        for (final bag in candidateList) {
           final grp = JsonParsers.asString(
-            bag['blood_group'] ?? bag['group'],
+            bag['blood_group'] ?? bag['bloodGroup'] ?? bag['group'],
           );
           if (grp.isEmpty) continue;
           final st = JsonParsers.asString(bag['status']).toLowerCase();
-          final available = st.isEmpty ||
+          final isAvail = st.isEmpty ||
               st == 'available' ||
               st == 'in stock' ||
+              st == 'in_stock' ||
               st == 'active';
-          grouped[grp] = (grouped[grp] ?? 0) + (available ? 1 : 0);
+          if (isAvail) {
+            counts[grp] = (counts[grp] ?? 0) + 1;
+          } else {
+            counts.putIfAbsent(grp, () => 0);
+          }
         }
-        return grouped.entries
+        return counts.entries
             .map(
               (e) => BloodBankGroupItem(
                 id: e.key,
                 bloodGroup: e.key,
-                componentType: 'Blood / Component Bags',
                 availableBags: e.value,
-                status: e.value > 0 ? 'Available' : '0 Bags',
               ),
             )
             .toList();
       }
-      return list.map(BloodBankGroupItem.fromJson).toList();
-    }
 
-    final obj = JsonParsers.extractObject(raw);
-    const stdGroups = <String>[
-      'A+',
-      'A-',
-      'B+',
-      'B-',
-      'AB+',
-      'AB-',
-      'O+',
-      'O-',
-    ];
-    final mapSource = obj['stock'] is Map
-        ? JsonParsers.asMap(obj['stock'])
-        : (obj['groups'] is Map ? JsonParsers.asMap(obj['groups']) : obj);
-    final extracted = <BloodBankGroupItem>[];
-    for (final grp in stdGroups) {
-      if (mapSource.containsKey(grp)) {
-        final v = mapSource[grp];
-        final cnt = v is Map
-            ? JsonParsers.asInt(v['available'] ?? v['bags'] ?? v['count'])
-            : JsonParsers.asInt(v);
-        extracted.add(
-          BloodBankGroupItem(
-            id: grp,
-            bloodGroup: grp,
-            componentType: 'Blood Units',
-            availableBags: cnt,
-            status: cnt > 0 ? 'Available' : '0 Bags',
-          ),
-        );
+      final parsed = candidateList
+          .map(BloodBankGroupItem.fromJson)
+          .where((item) => item.bloodGroup.isNotEmpty)
+          .toList();
+      if (parsed.isNotEmpty) {
+        return _orderByStandardGroups(parsed);
       }
     }
-    return extracted;
+
+    return const [];
+  }
+
+  static List<BloodBankGroupItem> _orderByStandardGroups(
+    List<BloodBankGroupItem> items,
+  ) {
+    final byGroup = <String, BloodBankGroupItem>{};
+    for (final item in items) {
+      byGroup[item.bloodGroup.toUpperCase()] = item;
+    }
+    final ordered = <BloodBankGroupItem>[];
+    for (final g in standardGroups) {
+      if (byGroup.containsKey(g)) {
+        ordered.add(byGroup.remove(g)!);
+      }
+    }
+    ordered.addAll(byGroup.values);
+    return ordered;
   }
 }
 
+/// Blood Donor Details (`[Donor Details]` button on `/admin/bloodbankstatus` image-9)
+class BloodDonorRecord {
+  final String id;
+  final String donorName;
+  final String bloodGroup;
+  final String gender;
+  final int age;
+  final String contactNo;
+  final DateTime? lastDonationDate;
+
+  const BloodDonorRecord({
+    required this.id,
+    required this.donorName,
+    required this.bloodGroup,
+    required this.gender,
+    required this.age,
+    required this.contactNo,
+    this.lastDonationDate,
+  });
+
+  factory BloodDonorRecord.fromJson(Map<String, dynamic> json) {
+    return BloodDonorRecord(
+      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      donorName: JsonParsers.asString(
+        json['donor_name'] ?? json['donorName'] ?? json['name'],
+        fallback: 'Donor',
+      ),
+      bloodGroup: JsonParsers.asString(
+        json['blood_group'] ?? json['bloodGroup'],
+        fallback: '—',
+      ),
+      gender: JsonParsers.asString(json['gender'], fallback: '—'),
+      age: JsonParsers.asInt(json['age']),
+      contactNo: JsonParsers.asString(
+        json['contact_no'] ?? json['contactNo'] ?? json['phone'] ?? json['mobileno'],
+      ),
+      lastDonationDate: JsonParsers.asDateTime(
+        json['donate_date'] ?? json['last_donation_date'] ?? json['createdAt'],
+      ),
+    );
+  }
+}
+
+/// Annual Calendar Holiday (`GET /api/holidays` — matches Website `/calendar` image-11)
 class HospitalHolidayItem {
   final String id;
   final String title;
@@ -132,6 +267,7 @@ class HospitalHolidayItem {
   final DateTime? toDate;
   final String createdBy;
   final bool frontSite;
+  final bool isDefault;
 
   const HospitalHolidayItem({
     required this.id,
@@ -141,25 +277,78 @@ class HospitalHolidayItem {
     this.toDate,
     required this.createdBy,
     required this.frontSite,
+    this.isDefault = false,
   });
 
+  DateTime? get date => fromDate;
+
+  bool isToday(DateTime now) {
+    if (fromDate == null) return false;
+    final d = fromDate!.toLocal();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  bool isUpcoming(DateTime now) {
+    if (fromDate == null) return false;
+    final d = fromDate!.toLocal();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final itemDay = DateTime(d.year, d.month, d.day);
+    return itemDay.isAfter(todayStart);
+  }
+
+  bool isPast(DateTime now) {
+    if (fromDate == null) return false;
+    final d = fromDate!.toLocal();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final itemDay = DateTime(d.year, d.month, d.day);
+    return itemDay.isBefore(todayStart);
+  }
+
   factory HospitalHolidayItem.fromJson(Map<String, dynamic> json) {
+    final createdByStr = JsonParsers.asString(
+      json['created_by_name'] ??
+          json['createdByName'] ??
+          json['created_by'] ??
+          json['createdBy'] ??
+          json['source'],
+      fallback: 'Hospital Administration',
+    );
+    final defaultFlag = JsonParsers.asBool(
+      json['is_default'] ??
+          json['isDefault'] ??
+          (createdByStr.toLowerCase().contains('government') ? true : null),
+    );
     return HospitalHolidayItem(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       title: JsonParsers.asString(
-        json['description'] ?? json['title'] ?? json['name'],
-        fallback: 'Hospital Event',
+        json['description'] ??
+            json['title'] ??
+            json['name'] ??
+            json['holiday_name'] ??
+            json['holidayName'],
+        fallback: 'Holiday',
       ),
-      type: JsonParsers.asString(json['type'], fallback: 'Holiday'),
+      type: JsonParsers.asString(
+        json['type'] ?? json['holiday_type'] ?? json['holidayType'],
+        fallback: 'Holiday',
+      ),
       fromDate: JsonParsers.asDateTime(
-        json['from_date'] ?? json['date'] ?? json['holiday_date'],
+        json['from_date'] ??
+            json['fromDate'] ??
+            json['date'] ??
+            json['start_date'] ??
+            json['startDate'] ??
+            json['holiday_date'],
       ),
-      toDate: JsonParsers.asDateTime(json['to_date']),
-      createdBy: JsonParsers.asString(
-        json['created_by_name'] ?? json['created_by'],
-        fallback: 'Hospital Administration',
+      toDate: JsonParsers.asDateTime(
+        json['to_date'] ?? json['toDate'] ?? json['end_date'],
       ),
-      frontSite: JsonParsers.asBool(json['front_site'], fallback: true),
+      createdBy: createdByStr,
+      frontSite: JsonParsers.asBool(
+        json['front_site'] ?? json['frontSite'],
+        fallback: true,
+      ),
+      isDefault: defaultFlag,
     );
   }
 }
@@ -183,220 +372,20 @@ class ChargeMasterItem {
     return ChargeMasterItem(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       name: JsonParsers.asString(json['name'] ?? json['charge_name']),
-      chargeType: JsonParsers.asString(json['charge_type'], fallback: 'IPD'),
+      chargeType: JsonParsers.asString(
+        json['charge_type'] ?? json['chargeType'],
+        fallback: 'IPD',
+      ),
       chargeCategory: JsonParsers.asString(
-        json['charge_category'],
+        json['charge_category'] ?? json['chargeCategory'],
         fallback: 'Nursing Charges',
       ),
       standardCharge: JsonParsers.asDouble(
-        json['standard_charge'] ?? json['applied_charge'] ?? json['amount'],
+        json['standard_charge'] ??
+            json['standardCharge'] ??
+            json['applied_charge'] ??
+            json['amount'],
       ),
-    );
-  }
-}
-
-class HospitalAppointmentItem {
-  final String id;
-  final String appointmentNo;
-  final String patientName;
-  final String patientUniqueId;
-  final String doctorName;
-  final String department;
-  final DateTime? date;
-  final String slot;
-  final String status;
-  final String message;
-
-  const HospitalAppointmentItem({
-    required this.id,
-    required this.appointmentNo,
-    required this.patientName,
-    required this.patientUniqueId,
-    required this.doctorName,
-    required this.department,
-    this.date,
-    required this.slot,
-    required this.status,
-    required this.message,
-  });
-
-  factory HospitalAppointmentItem.fromJson(Map<String, dynamic> json) {
-    final patMap = json['patient'] is Map
-        ? JsonParsers.asMap(json['patient'])
-        : <String, dynamic>{};
-    final docMap = json['doctor'] is Map
-        ? JsonParsers.asMap(json['doctor'])
-        : <String, dynamic>{};
-
-    final rawDoc = JsonParsers.asString(
-      docMap['name'] ?? json['doctor_name'] ?? json['doctor'],
-    );
-    final rawDocSur = JsonParsers.asString(docMap['surname']);
-
-    return HospitalAppointmentItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
-      appointmentNo: JsonParsers.asString(
-        json['appointment_no'] ?? json['app_no'],
-      ),
-      patientName: JsonParsers.asString(
-        json['patient_name'] ?? patMap['patient_name'] ?? patMap['name'],
-        fallback: 'Patient',
-      ),
-      patientUniqueId: JsonParsers.asString(
-        json['patient_unique_id'] ?? patMap['patient_unique_id'],
-      ),
-      doctorName: rawDoc.isNotEmpty
-          ? AppFormatters.formatDoctorName(rawDoc, rawDocSur)
-          : 'Consultant',
-      department: JsonParsers.asString(
-        json['department'] ?? docMap['department'],
-      ),
-      date: JsonParsers.asDateTime(
-        json['date'] ?? json['appointment_date'] ?? json['createdAt'],
-      ),
-      slot: JsonParsers.asString(
-        json['slot'] ?? json['time_slot'] ?? json['shift'],
-      ),
-      status: JsonParsers.asString(
-        json['appointment_status'] ?? json['status'],
-        fallback: 'Scheduled',
-      ),
-      message: JsonParsers.asString(json['message'] ?? json['symptoms']),
-    );
-  }
-}
-
-class StaffDirectoryMember {
-  final String id;
-  final String employeeId;
-  final String fullName;
-  final String role;
-  final String designation;
-  final String department;
-  final String specialist;
-  final String phone;
-  final String email;
-  final String? image;
-
-  const StaffDirectoryMember({
-    required this.id,
-    required this.employeeId,
-    required this.fullName,
-    required this.role,
-    required this.designation,
-    required this.department,
-    required this.specialist,
-    required this.phone,
-    required this.email,
-    this.image,
-  });
-
-  factory StaffDirectoryMember.fromJson(Map<String, dynamic> json) {
-    final first = JsonParsers.asString(json['name']);
-    final last = JsonParsers.asString(json['surname']);
-    final role = JsonParsers.asString(
-      json['role_name'] ?? json['role'],
-      fallback: 'Staff',
-    );
-    final rawFull = '$first $last'.trim();
-    final formattedName = role.toLowerCase().contains('doctor')
-        ? AppFormatters.formatDoctorName(first, last)
-        : (rawFull.isNotEmpty ? rawFull : 'Hospital Staff');
-    final img = JsonParsers.asString(json['image'] ?? json['photo']);
-
-    return StaffDirectoryMember(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
-      employeeId: JsonParsers.asString(
-        json['employee_id'] ?? json['staff_id'],
-      ),
-      fullName: formattedName,
-      role: role,
-      designation: JsonParsers.asString(json['designation']),
-      department: JsonParsers.asString(json['department']),
-      specialist: JsonParsers.asString(json['specialist']),
-      phone: JsonParsers.asString(
-        json['contact_no'] ?? json['mobileno'] ?? json['phone'],
-      ),
-      email: JsonParsers.asString(json['email']),
-      image: img.isEmpty ? null : img,
-    );
-  }
-}
-
-class PharmacyMedicineItem {
-  final String id;
-  final String medicineName;
-  final String category;
-  final String company;
-  final String unit;
-  final int availableQty;
-  final double salePrice;
-
-  const PharmacyMedicineItem({
-    required this.id,
-    required this.medicineName,
-    required this.category,
-    required this.company,
-    required this.unit,
-    required this.availableQty,
-    required this.salePrice,
-  });
-
-  factory PharmacyMedicineItem.fromJson(Map<String, dynamic> json) {
-    return PharmacyMedicineItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
-      medicineName: JsonParsers.asString(
-        json['medicine_name'] ?? json['name'] ?? json['bill_no'],
-        fallback: 'Pharmacy Item',
-      ),
-      category: JsonParsers.asString(
-        json['medicine_category'] ?? json['category'],
-        fallback: 'General',
-      ),
-      company: JsonParsers.asString(
-        json['medicine_company'] ?? json['company'],
-      ),
-      unit: JsonParsers.asString(json['unit'], fallback: 'Units'),
-      availableQty: JsonParsers.asInt(
-        json['available_qty'] ?? json['total_qty'] ?? json['quantity'] ?? json['qty'],
-      ),
-      salePrice: JsonParsers.asDouble(
-        json['sale_price'] ?? json['mrp'] ?? json['net_amount'] ?? json['total'],
-      ),
-    );
-  }
-}
-
-class InventoryStockItem {
-  final String id;
-  final String itemName;
-  final String category;
-  final int quantity;
-  final String supplier;
-
-  const InventoryStockItem({
-    required this.id,
-    required this.itemName,
-    required this.category,
-    required this.quantity,
-    required this.supplier,
-  });
-
-  factory InventoryStockItem.fromJson(Map<String, dynamic> json) {
-    return InventoryStockItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
-      itemName: JsonParsers.asString(
-        json['item_name'] ?? json['name'] ?? json['item'],
-        fallback: 'Ward Supply',
-      ),
-      category: JsonParsers.asString(
-        json['item_category'] ?? json['category'],
-        fallback: 'Consumables',
-      ),
-      quantity: JsonParsers.asInt(
-        json['available_quantity'] ?? json['quantity'] ?? json['qty'],
-      ),
-      supplier: JsonParsers.asString(json['supplier'] ?? json['store']),
     );
   }
 }
@@ -429,7 +418,9 @@ class ServerNotificationItem {
         json['message'] ?? json['description'] ?? json['body'],
       ),
       type: JsonParsers.asString(json['type'], fallback: 'clinical'),
-      isRead: JsonParsers.asBool(json['is_read'] ?? json['read']),
+      isRead: JsonParsers.asBool(
+        json['is_read'] ?? json['isRead'] ?? json['read'],
+      ),
       createdAt: JsonParsers.asDateTime(json['createdAt'] ?? json['date']),
     );
   }
@@ -443,7 +434,7 @@ class AbhaScanCheckinItem {
   final String abhaAddress;
   final String gender;
   final String mobile;
-  final String status; // pending | checked_in | completed
+  final String status;
   final DateTime? createdAt;
 
   const AbhaScanCheckinItem({
@@ -468,17 +459,24 @@ class AbhaScanCheckinItem {
   }
 
   factory AbhaScanCheckinItem.fromJson(Map<String, dynamic> json) {
+    final rawDoc = AppFormatters.initials(
+      JsonParsers.asString(json['patient_name'] ?? json['name']),
+    );
     return AbhaScanCheckinItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      id: JsonParsers.asId(json['_id'] ?? json['id'] ?? rawDoc),
       tokenNumber: JsonParsers.asString(
-        json['token_no'] ?? json['token'] ?? json['queue_no'],
+        json['token_no'] ?? json['tokenNo'] ?? json['token'] ?? json['queue_no'],
       ),
       patientName: JsonParsers.asString(
-        json['patient_name'] ?? json['name'],
-        fallback: 'ABHA Patient',
+        json['patient_name'] ?? json['patientName'] ?? json['name'],
+        fallback: 'ABHA Check-in',
       ),
-      abhaNumber: JsonParsers.asString(json['abha_number'] ?? json['abha_no']),
-      abhaAddress: JsonParsers.asString(json['abha_address']),
+      abhaNumber: JsonParsers.asString(
+        json['abha_number'] ?? json['abhaNumber'] ?? json['abha_no'],
+      ),
+      abhaAddress: JsonParsers.asString(
+        json['abha_address'] ?? json['abhaAddress'],
+      ),
       gender: JsonParsers.asString(json['gender']),
       mobile: JsonParsers.asString(
         json['mobile'] ?? json['mobileno'] ?? json['phone'],
