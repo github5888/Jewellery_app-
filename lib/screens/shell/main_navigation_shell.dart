@@ -15,12 +15,12 @@ import '../patients/patient_directory_screen.dart';
 import '../profile/nurse_profile_screen.dart';
 import '../roster/duty_roster_screen.dart';
 
-/// Main Nurse Portal App Shell matching `https://hospital.hrpocket.in` (image-4..15):
-/// - Personal-Theme-Aware Hospital Header with Global Search (`Search Name / Mobile / UHID...`),
-///   Bed Status shortcut, Live Alerts, and `Sunita Rao ⌄` Profile Dropdown (`My Profile`, `Change Password`, `Professional Info`, `My Theme`, `Logout`)
-/// - Exact 7-Item Nurse Sidebar Drawer (`Dashboard`, `Patient`, `OPD - Out Patient`,
-///   `IPD - In Patient`, `Blood Bank`, `Duty Roster`, `Annual Calendar`)
-/// - Fast Mobile Bottom Navigation Bar
+/// Main Nurse Portal App Shell:
+/// - On Dashboard (`Home`), `appBar` is completely hidden so NOTHING appears above
+///   the `Good Afternoon, Sunita` hero banner!
+/// - On inner website modules (`Patient`, `OPD`, `IPD`, `Blood Bank`, `Duty Roster`, `Annual Calendar`),
+///   shows a clean compact hospital header with Global Search & Profile access.
+/// - Clean `image-16.png` style Bottom Bar (`Home`, `Patients`, Center Navy `IPD` button, `OPD`, `More •••`).
 class MainNavigationShell extends StatefulWidget {
   const MainNavigationShell({super.key});
 
@@ -81,6 +81,267 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     }
   }
 
+  void _showMoreModulesSheet(BuildContext context) {
+    final controller = NursePortalScope.read(context);
+    final user = controller.currentUser;
+    final themePreset = controller.personalTheme;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) {
+        Widget tile({
+          required IconData icon,
+          required Color bg,
+          required Color fg,
+          required String title,
+          required String subtitle,
+          required VoidCallback onTap,
+        }) {
+          return ListTile(
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 2,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: bg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: fg, size: 20),
+            ),
+            title: Text(
+              title,
+              style: const TextStyle(
+                color: Color(0xFF0F2544),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            subtitle: Text(
+              subtitle,
+              style: const TextStyle(
+                color: Color(0xFF64748B),
+                fontSize: 11.5,
+              ),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: Color(0xFF94A3B8),
+            ),
+            onTap: onTap,
+          );
+        }
+
+        return SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(18, 12, 18, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCE7F5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+
+                // Nurse Profile Card (`My Profile` — Edit, Password, Professional Info, My Theme)
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openProfileTab(context, 0);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F8FF),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFDCE7F5)),
+                    ),
+                    child: Row(
+                      children: [
+                        PatientAvatar(
+                          name: user?.fullName ?? 'Nurse',
+                          imagePath: user?.image,
+                          baseUrl: controller.baseUrl,
+                          radius: 22,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user?.fullName ?? 'Duty Nurse',
+                                style: const TextStyle(
+                                  color: Color(0xFF0F2544),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                '${user?.roleName ?? "Nurse"}${user != null && user.staffCode.isNotEmpty ? " • ID: ${user.staffCode}" : ""} • My Profile & Theme',
+                                style: TextStyle(
+                                  color: themePreset.primaryColor,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Color(0xFF64748B),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 14),
+                const Padding(
+                  padding: EdgeInsets.only(left: 6, bottom: 4),
+                  child: Text(
+                    'HOSPITAL NURSE MODULES',
+                    style: TextStyle(
+                      color: Color(0xFF64748B),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+
+                tile(
+                  icon: Icons.water_drop_rounded,
+                  bg: const Color(0xFFFFE4E6),
+                  fg: const Color(0xFFE11D48),
+                  title: 'Blood Bank Status',
+                  subtitle: 'Available blood bags & donor details',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    controller.setSelectedNavIndex(NurseNavIndex.bloodBank);
+                  },
+                ),
+                tile(
+                  icon: Icons.schedule_rounded,
+                  bg: const Color(0xFFFEF3C7),
+                  fg: const Color(0xFFD97706),
+                  title: 'Duty Roster',
+                  subtitle: 'Staff duty shifts & department schedule',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    controller.setSelectedNavIndex(NurseNavIndex.dutyRoster);
+                  },
+                ),
+                tile(
+                  icon: Icons.calendar_month_rounded,
+                  bg: const Color(0xFFE0F2FE),
+                  fg: const Color(0xFF0284C7),
+                  title: 'Annual Calendar',
+                  subtitle: 'Hospital holidays & important dates',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    controller
+                        .setSelectedNavIndex(NurseNavIndex.annualCalendar);
+                  },
+                ),
+                tile(
+                  icon: Icons.bed_rounded,
+                  bg: const Color(0xFFE6F7EF),
+                  fg: const Color(0xFF129A56),
+                  title: 'Bed Status',
+                  subtitle: 'Live ward bed occupancy & allocation',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const BedStatusScreen(),
+                      ),
+                    );
+                  },
+                ),
+                tile(
+                  icon: Icons.notifications_active_outlined,
+                  bg: const Color(0xFFF3E8FF),
+                  fg: const Color(0xFF7C3AED),
+                  title: 'Live Clinical Alerts',
+                  subtitle: 'Ward notifications & real-time updates',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                tile(
+                  icon: Icons.brush_rounded,
+                  bg: const Color(0xFFEBF3FF),
+                  fg: const Color(0xFF155EEF),
+                  title: 'My Theme',
+                  subtitle: 'Switch personal hospital portal theme',
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _openProfileTab(context, 3);
+                  },
+                ),
+                const Divider(height: 16),
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      color: AppColors.danger,
+                      size: 20,
+                    ),
+                  ),
+                  title: const Text(
+                    'Logout',
+                    style: TextStyle(
+                      color: AppColors.danger,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _confirmLogout(context, controller);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
@@ -90,9 +351,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
     final user = controller.currentUser;
     final themePreset = controller.personalTheme;
     final appBarFg = themePreset.appBarForeground;
-
-    // Map 7 sidebar pages onto 5 bottom bar items (0..3 direct, 4..6 -> Modules drawer)
-    final bottomIndex = currentIndex <= 3 ? currentIndex : 4;
+    final isDashboard = currentIndex == NurseNavIndex.dashboard;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -104,281 +363,95 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           controller.setSelectedNavIndex(idx);
         },
       ),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(60),
-        child: Container(
-          decoration: BoxDecoration(
-            color: themePreset.appBarColor,
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x1F000000),
-                blurRadius: 8,
-                offset: Offset(0, 2),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: 'Nurse Menu',
-                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                    icon: Icon(Icons.menu_rounded, color: appBarFg),
-                  ),
-                  // Tap-to-Search Global Search Pill (matching image-4..15 top bar)
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => showGlobalHospitalSearchSheet(context),
-                      child: Container(
-                        height: 38,
-                        padding: const EdgeInsets.symmetric(horizontal: 11),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(20),
-                          border: themePreset.id == 'glacier_blue'
-                              ? Border.all(color: AppColors.border)
-                              : null,
-                        ),
-                        child: const Row(
-                          children: [
-                            Icon(
-                              Icons.search_rounded,
-                              size: 17,
-                              color: Color(0xFF64748B),
-                            ),
-                            SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                'Search Name / Mobile / UHID...',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: Color(0xFF64748B),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+      // NO AppBar on Dashboard so nothing sits above `Good Afternoon, Sunita`!
+      appBar: isDashboard
+          ? null
+          : PreferredSize(
+              preferredSize: const Size.fromHeight(56),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: themePreset.appBarColor,
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x18000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
                     ),
-                  ),
-                  const SizedBox(width: 2),
-                  IconButton(
-                    tooltip: 'Bed Status',
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const BedStatusScreen(),
+                  ],
+                ),
+                child: SafeArea(
+                  bottom: false,
+                  child: Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Nurse Menu',
+                          onPressed: () =>
+                              _scaffoldKey.currentState?.openDrawer(),
+                          icon: Icon(Icons.menu_rounded, color: appBarFg),
                         ),
-                      );
-                    },
-                    icon: Icon(
-                      Icons.bed_rounded,
-                      color: appBarFg,
-                      size: 20,
-                    ),
-                  ),
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      IconButton(
-                        tooltip: 'Live Alerts',
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const NotificationsScreen(),
-                            ),
-                          );
-                        },
-                        icon: Icon(
-                          Icons.notifications_none_rounded,
-                          color: appBarFg,
-                          size: 20,
-                        ),
-                      ),
-                      if (controller.unreadAlertsCount > 0)
-                        Positioned(
-                          right: 6,
-                          top: 6,
-                          child: Container(
-                            padding: const EdgeInsets.all(3.5),
-                            decoration: const BoxDecoration(
-                              color: AppColors.danger,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              '${controller.unreadAlertsCount > 9 ? "9+" : controller.unreadAlertsCount}',
-                              style: const TextStyle(
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => showGlobalHospitalSearchSheet(context),
+                            child: Container(
+                              height: 36,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 11),
+                              decoration: BoxDecoration(
                                 color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w800,
+                                borderRadius: BorderRadius.circular(20),
+                                border: themePreset.id == 'glacier_blue'
+                                    ? Border.all(color: AppColors.border)
+                                    : null,
+                              ),
+                              child: const Row(
+                                children: [
+                                  Icon(
+                                    Icons.search_rounded,
+                                    size: 17,
+                                    color: Color(0xFF64748B),
+                                  ),
+                                  SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      'Search Name / Mobile / UHID...',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Color(0xFF64748B),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                  // `Sunita Rao ⌄` Profile Dropdown matching website header (image-12..15)
-                  PopupMenuButton<String>(
-                    tooltip: 'My Profile & Theme',
-                    offset: const Offset(0, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    onSelected: (val) {
-                      switch (val) {
-                        case 'edit':
-                          _openProfileTab(context, 0);
-                          break;
-                        case 'password':
-                          _openProfileTab(context, 1);
-                          break;
-                        case 'professional':
-                          _openProfileTab(context, 2);
-                          break;
-                        case 'theme':
-                          _openProfileTab(context, 3);
-                          break;
-                        case 'logout':
-                          _confirmLogout(context, controller);
-                          break;
-                      }
-                    },
-                    itemBuilder: (ctx) => [
-                      PopupMenuItem<String>(
-                        enabled: false,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user?.fullName ?? 'Duty Nurse',
-                              style: const TextStyle(
-                                color: Color(0xFF0F172A),
-                                fontWeight: FontWeight.w800,
-                                fontSize: 13.5,
-                              ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => _openProfileTab(context, 0),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8, left: 4),
+                            child: PatientAvatar(
+                              name: user?.fullName ?? 'Nurse',
+                              imagePath: user?.image,
+                              baseUrl: controller.baseUrl,
+                              radius: 15,
+                              backgroundColor: Colors.white,
+                              textColor: themePreset.primaryColor,
                             ),
-                            Text(
-                              '${user?.roleName ?? "Nurse"}${user != null && user.staffCode.isNotEmpty ? " • ID: ${user.staffCode}" : ""}',
-                              style: const TextStyle(
-                                color: Color(0xFF64748B),
-                                fontSize: 11.5,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem<String>(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.person_outline_rounded, size: 18),
-                            SizedBox(width: 10),
-                            Text('My Profile'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'password',
-                        child: Row(
-                          children: [
-                            Icon(Icons.lock_outline_rounded, size: 18),
-                            SizedBox(width: 10),
-                            Text('Change Password'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'professional',
-                        child: Row(
-                          children: [
-                            Icon(Icons.badge_outlined, size: 18),
-                            SizedBox(width: 10),
-                            Text('Professional Info'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem<String>(
-                        value: 'theme',
-                        child: Row(
-                          children: [
-                            Icon(Icons.brush_rounded, size: 18),
-                            SizedBox(width: 10),
-                            Text('My Theme'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem<String>(
-                        value: 'logout',
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.logout_rounded,
-                              size: 18,
-                              color: AppColors.danger,
-                            ),
-                            SizedBox(width: 10),
-                            Text(
-                              'Logout',
-                              style: TextStyle(
-                                color: AppColors.danger,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      padding: const EdgeInsets.fromLTRB(3, 3, 6, 3),
-                      decoration: BoxDecoration(
-                        color: themePreset.id == 'glacier_blue'
-                            ? Colors.white
-                            : const Color(0x28FFFFFF),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: themePreset.id == 'glacier_blue'
-                              ? AppColors.border
-                              : const Color(0x40FFFFFF),
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          PatientAvatar(
-                            name: user?.fullName ?? 'Nurse',
-                            imagePath: user?.image,
-                            baseUrl: controller.baseUrl,
-                            radius: 14,
-                            backgroundColor: Colors.white,
-                            textColor: themePreset.primaryColor,
                           ),
-                          const SizedBox(width: 3),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 16,
-                            color: appBarFg,
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
       body: Stack(
         children: [
           IndexedStack(
@@ -386,10 +459,9 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             children: _pages,
           ),
 
-          // Live Socket.IO Floating Clinical Event Banner
           if (banner != null)
             Positioned(
-              top: 10,
+              top: isDashboard ? 42 : 10,
               left: 14,
               right: 14,
               child: Material(
@@ -460,63 +532,216 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
             ),
         ],
       ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
-        ),
-        child: BottomNavigationBar(
-          currentIndex: bottomIndex,
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
-          elevation: 0,
-          selectedItemColor: themePreset.primaryColor,
-          unselectedItemColor: AppColors.textMuted,
-          selectedFontSize: 11.5,
-          unselectedFontSize: 11.5,
-          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800),
-          onTap: (idx) {
-            if (idx <= 3) {
-              controller.setSelectedNavIndex(idx);
-            } else {
-              _scaffoldKey.currentState?.openDrawer();
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.desktop_windows_outlined),
-              activeIcon: Icon(Icons.desktop_windows_rounded),
-              label: 'Dashboard',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.person_outline_rounded),
-              activeIcon: Icon(Icons.person_rounded),
-              label: 'Patient',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.medical_services_outlined),
-              activeIcon: Icon(Icons.medical_services_rounded),
-              label: 'OPD',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.hotel_outlined),
-              activeIcon: Icon(Icons.hotel_rounded),
-              label: 'IPD',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.apps_rounded),
-              activeIcon: Icon(Icons.apps_rounded),
-              label: 'Modules',
-            ),
-          ],
+      bottomNavigationBar: _ModernNurseBottomBar(
+        currentIndex: currentIndex,
+        unreadAlerts: controller.unreadAlertsCount,
+        primaryColor: themePreset.primaryColor,
+        onSelectIndex: controller.setSelectedNavIndex,
+        onTapMore: () => _showMoreModulesSheet(context),
+      ),
+    );
+  }
+}
+
+/// Clean `image-16.png` Bottom Navigation Bar with elevated center IPD Ward button
+class _ModernNurseBottomBar extends StatelessWidget {
+  final int currentIndex;
+  final int unreadAlerts;
+  final Color primaryColor;
+  final ValueChanged<int> onSelectIndex;
+  final VoidCallback onTapMore;
+
+  const _ModernNurseBottomBar({
+    required this.currentIndex,
+    required this.unreadAlerts,
+    required this.primaryColor,
+    required this.onSelectIndex,
+    required this.onTapMore,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isMoreSelected = currentIndex >= NurseNavIndex.bloodBank;
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: [
+          BoxShadow(
+            color: Color(0x140A3977),
+            blurRadius: 18,
+            offset: Offset(0, -4),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 66,
+          child: Row(
+            children: [
+              Expanded(
+                child: _BottomNavSlot(
+                  icon: Icons.home_rounded,
+                  label: 'Home',
+                  selected: currentIndex == NurseNavIndex.dashboard,
+                  activeColor: primaryColor,
+                  onTap: () => onSelectIndex(NurseNavIndex.dashboard),
+                ),
+              ),
+              Expanded(
+                child: _BottomNavSlot(
+                  icon: Icons.groups_rounded,
+                  label: 'Patients',
+                  selected: currentIndex == NurseNavIndex.patients,
+                  activeColor: primaryColor,
+                  onTap: () => onSelectIndex(NurseNavIndex.patients),
+                ),
+              ),
+              // Prominent Center Navy Circle Button (IPD In-Patient Ward)
+              SizedBox(
+                width: 68,
+                child: Center(
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => onSelectIndex(NurseNavIndex.ipd),
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: currentIndex == NurseNavIndex.ipd
+                              ? [primaryColor, primaryColor]
+                              : const [Color(0xFF0A3977), Color(0xFF155EEF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x330A3977),
+                            blurRadius: 12,
+                            offset: Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.hotel_rounded,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: _BottomNavSlot(
+                  icon: Icons.medical_services_rounded,
+                  label: 'OPD',
+                  selected: currentIndex == NurseNavIndex.opd,
+                  activeColor: primaryColor,
+                  onTap: () => onSelectIndex(NurseNavIndex.opd),
+                ),
+              ),
+              Expanded(
+                child: _BottomNavSlot(
+                  icon: Icons.more_horiz_rounded,
+                  label: 'More',
+                  selected: isMoreSelected,
+                  badgeCount: unreadAlerts,
+                  activeColor: primaryColor,
+                  onTap: onTapMore,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Exact 7-Item Nurse Sidebar from `https://hospital.hrpocket.in` (image-5):
-/// Dashboard, Patient, OPD - Out Patient, IPD - In Patient, Blood Bank, Duty Roster, Annual Calendar
+class _BottomNavSlot extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final int badgeCount;
+  final Color activeColor;
+  final VoidCallback onTap;
+
+  const _BottomNavSlot({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    this.badgeCount = 0,
+    required this.activeColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? activeColor : const Color(0xFF7B8CA6);
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Icon(icon, color: color, size: 23),
+              if (badgeCount > 0)
+                Positioned(
+                  right: -7,
+                  top: -5,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 4.5,
+                      vertical: 1,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 3),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: selected ? 22 : 0,
+            height: 2.5,
+            decoration: BoxDecoration(
+              color: activeColor,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Exact 7-Item Nurse Sidebar from `https://hospital.hrpocket.in` (image-5)
 class _NurseWebsiteSidebarDrawer extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onSelectIndex;
