@@ -791,6 +791,30 @@ class NurseApiService {
     return const [];
   }
 
+  /// Fetches the live hospital staff directory (`GET /api/staff`) so Duty Roster
+  /// populates `All Staff (N)` and `All Departments` identically to the website (image-17 & image-20).
+  Future<List<StaffRosterMember>> fetchStaffDirectory() async {
+    try {
+      final res = await _client.get(endpoints.staffList);
+      final parsed = JsonParsers.extractList(
+        res,
+        candidateKeys: const ['staff', 'users', 'members', 'records', 'items', 'data'],
+      ).map(StaffRosterMember.fromJson).toList();
+      parsed.sort((a, b) {
+        final ai = int.tryParse(a.employeeId);
+        final bi = int.tryParse(b.employeeId);
+        if (ai != null && bi != null) return ai.compareTo(bi);
+        if (a.employeeId.isNotEmpty && b.employeeId.isNotEmpty) {
+          return a.employeeId.compareTo(b.employeeId);
+        }
+        return a.fullName.compareTo(b.fullName);
+      });
+      return parsed;
+    } catch (_) {
+      return const [];
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // 9. Annual Calendar / Holidays (`/calendar` — image-11)
   // ---------------------------------------------------------------------------

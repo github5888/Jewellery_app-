@@ -6,11 +6,12 @@ import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Executive Mobile Annual Calendar Screen (`GET /api/holidays`):
-/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader`
-/// - Smooth Capsule Tabs (`Upcoming`, `Today`, `Past`, `All`)
-/// - `PremiumSearchField` + Type Selector
-/// - Sculpted Two-Tone Calendar Leaf Holiday Cards (`NOV 24`, `Guru Nanak's Birthday`, `Front Site: Yes`).
+/// Website-Aligned Annual Calendar Screen (`/calendar` — image-21):
+/// - Live `GET /api/holidays` integration
+/// - Header pills (`India · 2026`, `14 Holidays`)
+/// - Exact 4 Tabs (`Upcoming`, `Today`, `Past`, `All Holidays`) with live counts
+/// - Exact `All Types` dropdown (`All Types`, `Holiday`, `Activity`, `Vacation` + any live custom types)
+/// - `Search description, date...` + Holiday Cards (`DATE`, `TYPE`, `DESCRIPTION`, `CREATED BY`, `FRONT SITE`, `Default`).
 class AnnualCalendarScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -24,6 +25,12 @@ class AnnualCalendarScreen extends StatefulWidget {
 }
 
 class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
+  static const List<String> _websiteBaseTypes = [
+    'Holiday',
+    'Activity',
+    'Vacation',
+  ];
+
   final _searchCtrl = TextEditingController();
   String _selectedTab = 'upcoming';
   String _selectedType = 'All Types';
@@ -32,6 +39,25 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  List<String> _buildTypeOptions(List<HospitalHolidayItem> allHolidays) {
+    final seenLower = <String>{'all types'};
+    final ordered = <String>['All Types'];
+
+    for (final base in _websiteBaseTypes) {
+      seenLower.add(base.toLowerCase());
+      ordered.add(base);
+    }
+
+    for (final h in allHolidays) {
+      final raw = h.type.trim();
+      if (raw.isEmpty) continue;
+      if (seenLower.add(raw.toLowerCase())) {
+        ordered.add(raw);
+      }
+    }
+    return ordered;
   }
 
   @override
@@ -51,10 +77,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
     final todayList = allHolidays.where((h) => h.isToday(now)).toList();
     final pastList = allHolidays.where((h) => h.isPast(now)).toList();
 
-    final typeOptions = <String>{
-      'All Types',
-      ...allHolidays.map((h) => h.type.trim()).where((t) => t.isNotEmpty),
-    }.toList();
+    final typeOptions = _buildTypeOptions(allHolidays);
     final activeType =
         typeOptions.contains(_selectedType) ? _selectedType : 'All Types';
 
@@ -85,10 +108,13 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
         final dateStr = AppFormatters.formatCalendarDate(h.date).toLowerCase();
         return h.title.toLowerCase().contains(q) ||
             h.createdBy.toLowerCase().contains(q) ||
+            h.type.toLowerCase().contains(q) ||
             dateStr.contains(q);
       }
       return true;
     }).toList();
+
+    final isTypeFiltered = activeType != 'All Types';
 
     final content = RefreshIndicator(
       color: primary,
@@ -100,38 +126,60 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
           if (widget.isEmbeddedInShell)
             MobileScreenHeader(
               title: 'Annual Calendar',
-              subtitle: 'India • ${now.year} hospital holidays & notices',
-              countBadge: '${allHolidays.length}',
+              subtitle: 'Administration / Annual Calendar',
+              countBadge: '${allHolidays.length} Holidays',
+              trailingAction: Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7ED),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFED7AA)),
+                ),
+                child: Text(
+                  'India · ${now.year}',
+                  style: const TextStyle(
+                    color: Color(0xFFC2410C),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
             ),
 
-          // Capsule Tabs Row
+          // Exact 4 Website Tabs (`Upcoming`, `Today`, `Past`, `All Holidays`)
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 _CalendarTabPill(
-                  label: 'Upcoming (${upcomingList.length})',
+                  label: 'Upcoming',
+                  count: upcomingList.length,
                   selected: _selectedTab == 'upcoming',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'upcoming'),
                 ),
                 const SizedBox(width: 7),
                 _CalendarTabPill(
-                  label: 'Today (${todayList.length})',
+                  label: 'Today',
+                  count: todayList.length,
                   selected: _selectedTab == 'today',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'today'),
                 ),
                 const SizedBox(width: 7),
                 _CalendarTabPill(
-                  label: 'Past (${pastList.length})',
+                  label: 'Past',
+                  count: pastList.length,
                   selected: _selectedTab == 'past',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'past'),
                 ),
                 const SizedBox(width: 7),
                 _CalendarTabPill(
-                  label: 'All (${allHolidays.length})',
+                  label: 'All Holidays',
+                  count: allHolidays.length,
                   selected: _selectedTab == 'all',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'all'),
@@ -142,49 +190,79 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
 
           const SizedBox(height: 12),
 
-          // Search + Type Filter
+          // `All Types` Dropdown (`All Types`, `Holiday`, `Activity`, `Vacation`) + Search Box
           Row(
             children: [
               Container(
-                height: 50,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                width: 136,
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+                  color: isTypeFiltered ? primary.withAlpha(14) : Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color:
+                        isTypeFiltered ? primary.withAlpha(120) : AppColors.border,
+                  ),
                   boxShadow: const [
                     BoxShadow(
                       color: Color(0x080F172A),
-                      blurRadius: 14,
+                      blurRadius: 12,
                       offset: Offset(0, 4),
                     ),
                   ],
                 ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: activeType,
-                    isDense: true,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      size: 17,
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.category_outlined,
+                      size: 15,
+                      color: isTypeFiltered ? primary : AppColors.textSecondary,
                     ),
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                    ),
-                    items: typeOptions
-                        .map(
-                          (t) => DropdownMenuItem<String>(
-                            value: t,
-                            child: Text(t),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: activeType,
+                          isExpanded: true,
+                          isDense: true,
+                          borderRadius: BorderRadius.circular(14),
+                          dropdownColor: Colors.white,
+                          icon: Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            size: 17,
+                            color: isTypeFiltered
+                                ? primary
+                                : AppColors.textSecondary,
                           ),
-                        )
-                        .toList(),
-                    onChanged: (v) {
-                      if (v != null) setState(() => _selectedType = v);
-                    },
-                  ),
+                          style: TextStyle(
+                            color:
+                                isTypeFiltered ? primary : AppColors.textPrimary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          items: typeOptions
+                              .map(
+                                (t) => DropdownMenuItem<String>(
+                                  value: t,
+                                  child: Text(
+                                    t,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _selectedType = v);
+                          },
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(width: 8),
@@ -192,7 +270,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
                 child: PremiumSearchField(
                   controller: _searchCtrl,
                   accentColor: primary,
-                  hintText: 'Search holiday or date...',
+                  hintText: 'Search description, date...',
                   onChanged: (_) => setState(() {}),
                 ),
               ),
@@ -202,17 +280,52 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
           const SizedBox(height: 16),
 
           if (filtered.isEmpty)
-            const SoftSurfaceCard(
+            SoftSurfaceCard(
               child: ClinicalEmptyState(
                 icon: Icons.event_note_outlined,
                 title: 'No Calendar Events in View',
-                subtitle: 'Switch tabs above or clear search filters.',
+                subtitle: isTypeFiltered || q.isNotEmpty
+                    ? 'No "$activeType" records match the current tab or search.'
+                    : 'Switch tabs above to view other calendar dates.',
+                actionLabel:
+                    (isTypeFiltered || q.isNotEmpty) ? 'Reset Filter' : null,
+                onAction: (isTypeFiltered || q.isNotEmpty)
+                    ? () => setState(() {
+                          _selectedType = 'All Types';
+                          _searchCtrl.clear();
+                        })
+                    : null,
               ),
             )
-          else
+          else ...[
             ...filtered.map(
               (item) => _HolidayCard(item: item, primaryColor: primary),
             ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Records: 1 to ${filtered.length} of ${filtered.length}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    'Type: $activeType',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -236,12 +349,14 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
 
 class _CalendarTabPill extends StatelessWidget {
   final String label;
+  final int count;
   final bool selected;
   final Color primary;
   final VoidCallback onTap;
 
   const _CalendarTabPill({
     required this.label,
+    required this.count,
     required this.selected,
     required this.primary,
     required this.onTap,
@@ -250,14 +365,14 @@ class _CalendarTabPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(14),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? primary : Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: selected ? primary : AppColors.border),
           boxShadow: selected
               ? [
@@ -269,13 +384,37 @@ class _CalendarTabPill extends StatelessWidget {
                 ]
               : null,
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: selected ? Colors.white : AppColors.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.white.withAlpha(45)
+                    : const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  fontFeatures: AppTheme.tabularNums,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -290,6 +429,17 @@ class _HolidayCard extends StatelessWidget {
     required this.item,
     required this.primaryColor,
   });
+
+  ({Color bg, Color fg}) _typePalette(String type) {
+    final lower = type.trim().toLowerCase();
+    if (lower == 'activity') {
+      return (bg: const Color(0xFFF3E8FF), fg: const Color(0xFF7E22CE));
+    }
+    if (lower == 'vacation') {
+      return (bg: const Color(0xFFFEF3C7), fg: const Color(0xFFB45309));
+    }
+    return (bg: const Color(0xFFE0F2FE), fg: const Color(0xFF0369A1));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -310,6 +460,7 @@ class _HolidayCard extends StatelessWidget {
       'DEC',
     ];
     final monLabel = dt != null ? months[dt.month - 1] : '';
+    final typeColors = _typePalette(item.type);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -380,26 +531,26 @@ class _HolidayCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 15.5,
+                            fontSize: 15,
                             fontWeight: FontWeight.w800,
-                            letterSpacing: -0.3,
+                            letterSpacing: -0.2,
                           ),
                         ),
                       ),
                       const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
+                          horizontal: 8.5,
                           vertical: 3,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.warningSoft,
+                          color: typeColors.bg,
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: Text(
                           item.type,
-                          style: const TextStyle(
-                            color: Color(0xFFD97706),
+                          style: TextStyle(
+                            color: typeColors.fg,
                             fontSize: 10.5,
                             fontWeight: FontWeight.w800,
                           ),
@@ -407,60 +558,119 @@ class _HolidayCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${AppFormatters.formatCalendarDate(item.date)}  •  ${item.createdBy}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.calendar_today_outlined,
+                        size: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          AppFormatters.formatCalendarDate(item.date),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.verified_user_outlined,
+                            size: 13,
+                            color: Color(0xFF16A34A),
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            item.createdBy,
+                            style: const TextStyle(
+                              color: Color(0xFF15803D),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2.5,
+                          horizontal: 7,
+                          vertical: 2,
                         ),
                         decoration: BoxDecoration(
                           color: item.frontSite
-                              ? AppColors.successSoft
+                              ? const Color(0xFFECFDF5)
                               : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          'Front Site: ${item.frontSite ? "Yes" : "No"}',
-                          style: TextStyle(
-                            color: item.frontSite
-                                ? const Color(0xFF059669)
-                                : AppColors.textSecondary,
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              item.frontSite
+                                  ? Icons.check_circle_rounded
+                                  : Icons.remove_circle_outline_rounded,
+                              size: 11,
+                              color: item.frontSite
+                                  ? const Color(0xFF16A34A)
+                                  : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              'Front Site: ${item.frontSite ? "Yes" : "No"}',
+                              style: TextStyle(
+                                color: item.frontSite
+                                    ? const Color(0xFF047857)
+                                    : AppColors.textSecondary,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       if (item.isDefault)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2.5,
+                            horizontal: 7,
+                            vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(7),
+                            color: const Color(0xFFECFDF5),
+                            borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text(
-                            'Default',
-                            style: TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                            ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.lock_rounded,
+                                size: 10.5,
+                                color: Color(0xFF15803D),
+                              ),
+                              SizedBox(width: 3),
+                              Text(
+                                'Default',
+                                style: TextStyle(
+                                  color: Color(0xFF15803D),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                     ],

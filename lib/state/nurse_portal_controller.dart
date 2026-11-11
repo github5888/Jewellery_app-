@@ -65,6 +65,7 @@ class NursePortalController extends ChangeNotifier {
   List<HospitalBed> _beds = const [];
   List<WardBedGroup> _bedGroups = const [];
   List<DutyShiftAssignment> _allRosterShifts = const [];
+  List<StaffRosterMember> _staffDirectory = const [];
   List<MedicationPrescription> _wardPrescriptions = const [];
   List<BloodBankGroupItem> _bloodBankGroups = const [];
   List<HospitalHolidayItem> _holidays = const [];
@@ -128,6 +129,7 @@ class NursePortalController extends ChangeNotifier {
   List<HospitalBed> get beds => _beds;
   List<WardBedGroup> get bedGroups => _bedGroups;
   List<DutyShiftAssignment> get allRosterShifts => _allRosterShifts;
+  List<StaffRosterMember> get staffDirectory => _staffDirectory;
   List<MedicationPrescription> get wardPrescriptions => _wardPrescriptions;
   List<BloodBankGroupItem> get bloodBankGroups => _bloodBankGroups;
   List<HospitalHolidayItem> get holidays => _holidays;
@@ -666,6 +668,7 @@ class NursePortalController extends ChangeNotifier {
     _beds = const [];
     _bedGroups = const [];
     _allRosterShifts = const [];
+    _staffDirectory = const [];
     _wardPrescriptions = const [];
     _bloodBankGroups = const [];
     _holidays = const [];
@@ -786,6 +789,10 @@ class NursePortalController extends ChangeNotifier {
         .fetchMe()
         .then<NurseUser?>((v) => v, onError: (_) => _currentUser);
 
+    final staffFuture = api
+        .fetchStaffDirectory()
+        .then((v) => v, onError: (_) => _staffDirectory);
+
     final results = await Future.wait<dynamic>([
       dashFuture,
       allIpdFuture,
@@ -799,6 +806,7 @@ class NursePortalController extends ChangeNotifier {
       notificationsFuture,
       abhaFuture,
       meFuture,
+      staffFuture,
     ]);
 
     _dashboard = results[0] as NurseDashboardData?;
@@ -813,6 +821,10 @@ class NursePortalController extends ChangeNotifier {
     _serverNotifications = results[9] as List<ServerNotificationItem>;
     _abhaQueue = results[10] as List<AbhaScanCheckinItem>;
     final refreshedUser = results[11] as NurseUser?;
+    final loadedStaff = results[12] as List<StaffRosterMember>;
+    if (loadedStaff.isNotEmpty) {
+      _staffDirectory = loadedStaff;
+    }
     if (refreshedUser != null) {
       _currentUser = refreshedUser;
       if (refreshedUser.hospitalInfo != null) {

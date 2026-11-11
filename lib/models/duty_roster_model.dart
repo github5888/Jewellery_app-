@@ -42,6 +42,54 @@ class DutyShiftAssignment {
     return 'night_general';
   }
 
+  /// Matches website `All Shifts` dropdown (`Morning Shift`, `Evening Shift`, `General / Night`).
+  bool matchesShiftFilter(String selectedShift) {
+    final f = selectedShift.trim().toLowerCase();
+    if (f.isEmpty || f == 'all shifts') return true;
+    if (f.contains('morning')) return shiftCategory == 'morning';
+    if (f.contains('evening')) return shiftCategory == 'evening';
+    if (f.contains('general') || f.contains('night')) {
+      return shiftCategory == 'night_general';
+    }
+    return shiftName.trim().toLowerCase() == f;
+  }
+
+  /// Matches website `All Roles` dropdown (`Doctors`, `Nurses`, `Admins`, `Pharmacists`, `Pathologists`, `Radiologists`, `Receptionists`).
+  bool matchesRoleFilter(String selectedRole) {
+    final f = selectedRole.trim().toLowerCase();
+    if (f.isEmpty || f == 'all roles') return true;
+    final r = role.trim().toLowerCase();
+    if (f.startsWith('doctor')) return r.contains('doctor');
+    if (f.startsWith('nurse')) return r.contains('nurse');
+    if (f.startsWith('admin')) return r.contains('admin');
+    if (f.startsWith('pharmac')) return r.contains('pharmac');
+    if (f.startsWith('patholog')) return r.contains('patholog');
+    if (f.startsWith('radiolog')) return r.contains('radiolog');
+    if (f.startsWith('reception')) {
+      return r.contains('reception') || r.contains('front');
+    }
+    return r == f;
+  }
+
+  /// Matches website `All Staff (N)` dropdown (`Dr. Ajay Verma (9002)`, `Sunita Rao (9008)`, etc.).
+  bool matchesStaffMember(StaffRosterMember member) {
+    if (staffId.isNotEmpty && member.id.isNotEmpty && staffId == member.id) {
+      return true;
+    }
+    final cleanCode = staffCode.replaceAll('#', '').trim().toLowerCase();
+    final cleanEmp = member.employeeId.replaceAll('#', '').trim().toLowerCase();
+    if (cleanCode.isNotEmpty && cleanEmp.isNotEmpty && cleanCode == cleanEmp) {
+      return true;
+    }
+    String norm(String v) => v
+        .replaceAll(RegExp(r'^dr\.?\s+', caseSensitive: false), '')
+        .trim()
+        .toLowerCase();
+    final a = norm(staffName);
+    final b = norm(member.fullName);
+    return a.isNotEmpty && a == b;
+  }
+
   String get timeRangeLabel {
     if (shiftStart.isNotEmpty && shiftEnd.isNotEmpty) {
       return '$shiftStart - $shiftEnd';
@@ -206,3 +254,69 @@ class DutyShiftAssignment {
     );
   }
 }
+
+/// Hospital Staff Directory Member (`GET /api/staff`)
+/// Populates the website's `All Staff (N)` and `All Departments` dropdowns on `/duty-roster` (image-17 & image-20).
+class StaffRosterMember {
+  final String id;
+  final String employeeId;
+  final String fullName;
+  final String role;
+  final String department;
+
+  const StaffRosterMember({
+    required this.id,
+    required this.employeeId,
+    required this.fullName,
+    required this.role,
+    required this.department,
+  });
+
+  String get dropdownLabel =>
+      employeeId.isNotEmpty ? '$fullName ($employeeId)' : fullName;
+
+  String get uniqueKey =>
+      id.isNotEmpty ? id : (employeeId.isNotEmpty ? employeeId : fullName);
+
+  factory StaffRosterMember.fromJson(Map<String, dynamic> json) {
+    final first = JsonParsers.asString(json['name'] ?? json['first_name']);
+    final last = JsonParsers.asString(json['surname'] ?? json['last_name']);
+    final combined = '$first $last'.trim();
+    final rawFull = JsonParsers.asString(
+      json['full_name'] ?? json['fullName'] ?? json['staff_name'],
+      fallback: combined,
+    );
+
+    final roleStr = JsonParsers.asString(
+      json['role_name'] ??
+          json['roleName'] ??
+          json['role'] ??
+          json['designation'],
+    );
+
+    String formattedName = rawFull;
+    if (formattedName.isNotEmpty &&
+        roleStr.toLowerCase().contains('doctor')) {
+      formattedName = AppFormatters.formatDoctorName(formattedName);
+    }
+
+    final rawEmpId = JsonParsers.asString(
+      json['employee_id'] ??
+          json['employeeId'] ??
+          json['staff_id'] ??
+          json['staff_code'] ??
+          json['staffCode'],
+    ).replaceAll('#', '').trim();
+
+    return StaffRosterMember(
+      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      employeeId: rawEmpId,
+      fullName: formattedName.isEmpty ? 'Staff Member' : formattedName,
+      role: roleStr,
+      department: JsonParsers.asString(
+        json['department'] ?? json['department_name'],
+      ),
+    );
+  }
+}
+
