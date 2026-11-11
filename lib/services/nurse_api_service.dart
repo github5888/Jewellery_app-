@@ -128,19 +128,25 @@ class NurseApiService {
   }
 
   // ---------------------------------------------------------------------------
-  // 3. IPD Ward & Bed-Side Patient Care APIs
+  // 3. IPD Ward & Bed-Side Patient Care APIs (Exact Website Unfiltered Fetch)
   // ---------------------------------------------------------------------------
 
+  /// Fetches all IPD records from `GET https://hospital.hrpocket.in/api/ipd`
+  /// (identical to the live React web portal) and splits Admitted vs Discharged
+  /// via `IpdAdmission.isDischarged` so query-string casing differences never drop records.
   Future<List<IpdAdmission>> fetchIpdAdmissions({
-    String dischargeStatus = 'admitted',
+    String dischargeStatus = 'all',
   }) async {
-    final query = <String, String>{};
-    if (dischargeStatus.isNotEmpty && dischargeStatus != 'all') {
-      query['discharge_status'] = dischargeStatus;
+    final res = await _client.get(endpoints.ipdList);
+    final all = JsonParsers.extractList(res).map(IpdAdmission.fromJson).toList();
+    final filter = dischargeStatus.trim().toLowerCase();
+    if (filter == 'admitted') {
+      return all.where((ipd) => !ipd.isDischarged).toList();
     }
-    final res = await _client.get(endpoints.ipdList, queryParameters: query);
-    final list = JsonParsers.extractList(res);
-    return list.map(IpdAdmission.fromJson).toList();
+    if (filter == 'discharged') {
+      return all.where((ipd) => ipd.isDischarged).toList();
+    }
+    return all;
   }
 
   Future<IpdAdmission> fetchIpdPatientDetail(String ipdId) async {
@@ -297,12 +303,10 @@ class NurseApiService {
   // ---------------------------------------------------------------------------
 
   Future<List<HospitalBed>> fetchBeds({bool? isOccupied}) async {
-    final query = <String, String>{};
-    if (isOccupied != null) {
-      query['is_occupied'] = isOccupied.toString();
-    }
-    final res = await _client.get(endpoints.beds, queryParameters: query);
-    return JsonParsers.extractList(res).map(HospitalBed.fromJson).toList();
+    final res = await _client.get(endpoints.beds);
+    final all = JsonParsers.extractList(res).map(HospitalBed.fromJson).toList();
+    if (isOccupied == null) return all;
+    return all.where((b) => b.isOccupied == isOccupied).toList();
   }
 
   Future<List<WardBedGroup>> fetchBedGroups() async {
@@ -358,38 +362,54 @@ class NurseApiService {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. Nurse Duty Roster & Shifts APIs
+  // 7. Nurse Duty Roster & Shifts APIs (`GET /api/dutyroster` + sub-routes)
   // ---------------------------------------------------------------------------
 
   Future<List<DutyShiftAssignment>> fetchDutyRoster({String? staffId}) async {
-    final query = <String, String>{
-      if (staffId != null && staffId.trim().isNotEmpty)
-        'staff_id': staffId.trim(),
-    };
     final candidateUrls = <String>[
-      endpoints.dutyRosterAssignments,
       endpoints.dutyRoster,
+      endpoints.dutyRosterAssignments,
+      endpoints.dutyRosterRosters,
       endpoints.dutyRostersAssignmentsLegacy,
     ];
 
+    List<DutyShiftAssignment>? firstValidEmpty;
     ApiException? lastError;
+
     for (final url in candidateUrls) {
       try {
-        final res = await _client.get(url, queryParameters: query);
-        return JsonParsers.extractList(res)
-            .map(DutyShiftAssignment.fromJson)
-            .toList();
+        final res = await _client.get(url);
+        final parsed = JsonParsers.extractList(
+          res,
+          candidateKeys: const [
+            'assignments',
+            'rosters',
+            'records',
+            'items',
+            'data',
+          ],
+        ).map(DutyShiftAssignment.fromJson).toList();
+
+        if (parsed.isNotEmpty) {
+          if (staffId != null && staffId.trim().isNotEmpty) {
+            return parsed.where((s) => s.staffId == staffId.trim()).toList();
+          }
+          return parsed;
+        }
+        firstValidEmpty ??= parsed;
       } on ApiException catch (e) {
         lastError = e;
         if (!e.isNotFound) rethrow;
       }
     }
+
+    if (firstValidEmpty != null) return firstValidEmpty;
     if (lastError != null) throw lastError;
     return const [];
   }
 
   // ---------------------------------------------------------------------------
-  // 8. Patient Directory, Reports, Appointments, Staff, Pharmacy, Inventory, etc.
+  // 8. Patient Directory, ABHA Queue, Reports, Appointments, Staff, Pharmacy, etc.
   // ---------------------------------------------------------------------------
 
   Future<List<PatientDirectoryRecord>> fetchPatientDirectory() async {
@@ -404,12 +424,29 @@ class NurseApiService {
     return PatientDirectoryRecord.fromJson(JsonParsers.extractObject(res));
   }
 
+  Future<List<AbhaScanCheckinItem>> fetchAbhaQueue() async {
+    for (final url in [
+      endpoints.abhaScanShare,
+      endpoints.abhaQueue,
+      endpoints.abha,
+    ]) {
+      try {
+        final res = await _client.get(url);
+        final list = JsonParsers.extractList(res)
+            .map(AbhaScanCheckinItem.fromJson)
+            .toList();
+        if (list.isNotEmpty) return list;
+      } catch (_) {}
+    }
+    return const [];
+  }
+
   Future<List<ClinicalReportRecord>> fetchPathologyReports() async {
     for (final url in [endpoints.pathology, endpoints.pathologyBills]) {
       try {
         final res = await _client.get(url);
         final rawList = JsonParsers.extractList(res);
-        return rawList
+        final mapped = rawList
             .expand(
               (item) => ClinicalReportRecord.fromBillJson(
                 item,
@@ -417,6 +454,7 @@ class NurseApiService {
               ),
             )
             .toList();
+        if (mapped.isNotEmpty) return mapped;
       } on ApiException catch (e) {
         if (!e.isNotFound) rethrow;
       }
@@ -429,7 +467,7 @@ class NurseApiService {
       try {
         final res = await _client.get(url);
         final rawList = JsonParsers.extractList(res);
-        return rawList
+        final mapped = rawList
             .expand(
               (item) => ClinicalReportRecord.fromBillJson(
                 item,
@@ -437,6 +475,7 @@ class NurseApiService {
               ),
             )
             .toList();
+        if (mapped.isNotEmpty) return mapped;
       } on ApiException catch (e) {
         if (!e.isNotFound) rethrow;
       }
@@ -469,40 +508,56 @@ class NurseApiService {
   }
 
   Future<List<PharmacyMedicineItem>> fetchPharmacyStock() async {
-    for (final url in [endpoints.pharmacyMedicines, endpoints.pharmacy]) {
+    List<PharmacyMedicineItem>? emptyOk;
+    for (final url in [
+      endpoints.pharmacyMedicines,
+      endpoints.pharmacy,
+      endpoints.pharmacyBills,
+    ]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(res)
+        final parsed = JsonParsers.extractList(res)
             .map(PharmacyMedicineItem.fromJson)
             .toList();
+        if (parsed.isNotEmpty) return parsed;
+        emptyOk ??= parsed;
       } on ApiException catch (e) {
         if (!e.isNotFound) rethrow;
       }
     }
-    return const [];
+    return emptyOk ?? const [];
   }
 
   Future<List<InventoryStockItem>> fetchWardInventory() async {
-    for (final url in [endpoints.inventory, endpoints.itemStock]) {
+    List<InventoryStockItem>? emptyOk;
+    for (final url in [
+      endpoints.inventoryItems,
+      endpoints.inventoryStocks,
+      endpoints.inventory,
+      endpoints.itemStock,
+    ]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(res)
+        final parsed = JsonParsers.extractList(res)
             .map(InventoryStockItem.fromJson)
             .toList();
+        if (parsed.isNotEmpty) return parsed;
+        emptyOk ??= parsed;
       } on ApiException catch (e) {
         if (!e.isNotFound) rethrow;
       }
     }
-    return const [];
+    return emptyOk ?? const [];
   }
 
   Future<List<ServerNotificationItem>> fetchNotifications() async {
     for (final url in [endpoints.notifications, endpoints.messaging]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(res)
+        final parsed = JsonParsers.extractList(res)
             .map(ServerNotificationItem.fromJson)
             .toList();
+        if (parsed.isNotEmpty) return parsed;
       } catch (_) {}
     }
     return const [];
@@ -515,30 +570,49 @@ class NurseApiService {
   }
 
   Future<List<BloodBankGroupItem>> fetchBloodBank() async {
-    for (final url in [endpoints.bloodBank, endpoints.bloodBankAlt]) {
+    List<BloodBankGroupItem>? emptyOk;
+    ApiException? lastErr;
+    for (final url in [
+      endpoints.bloodBank,
+      endpoints.bloodBankStatus,
+      endpoints.bloodBankGroups,
+      endpoints.bloodBankInventory,
+      endpoints.bloodBankBags,
+      endpoints.bloodBankAlt,
+    ]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(res)
-            .map(BloodBankGroupItem.fromJson)
-            .toList();
+        final parsed = BloodBankGroupItem.parseFlexible(res);
+        if (parsed.isNotEmpty) return parsed;
+        emptyOk ??= parsed;
       } on ApiException catch (e) {
+        lastErr = e;
         if (!e.isNotFound) rethrow;
       }
     }
+    if (emptyOk != null) return emptyOk;
+    if (lastErr != null) throw lastErr;
     return const [];
   }
 
   Future<List<HospitalHolidayItem>> fetchHolidays() async {
+    List<HospitalHolidayItem>? emptyOk;
+    ApiException? lastErr;
     for (final url in [endpoints.holidays, endpoints.holidayAlt]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(res)
+        final parsed = JsonParsers.extractList(res)
             .map(HospitalHolidayItem.fromJson)
             .toList();
+        if (parsed.isNotEmpty) return parsed;
+        emptyOk ??= parsed;
       } on ApiException catch (e) {
+        lastErr = e;
         if (!e.isNotFound) rethrow;
       }
     }
+    if (emptyOk != null) return emptyOk;
+    if (lastErr != null) throw lastErr;
     return const [];
   }
 

@@ -16,7 +16,10 @@ class AppConfig {
   static const String localWebCorsProxyUrl = 'http://127.0.0.1:8787';
 
   /// Tracks whether Flutter Web is routing cross-origin requests via localWebCorsProxyUrl.
-  static bool webProxyActive = false;
+  static bool webProxyActive = const bool.fromEnvironment(
+    'USE_WEB_PROXY',
+    defaultValue: false,
+  );
 
   static const String storageKeyToken = 'smart_hospital_nurse_jwt';
   static const String storageKeyBaseUrl = 'smart_hospital_base_url';

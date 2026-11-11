@@ -23,7 +23,8 @@ class BloodBankGroupItem {
           json['qty'] ??
           json['quantity'] ??
           json['units'] ??
-          json['count'],
+          json['count'] ??
+          json['available'],
     );
     return BloodBankGroupItem(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
@@ -33,14 +34,93 @@ class BloodBankGroupItem {
       ),
       componentType: JsonParsers.asString(
         json['component'] ?? json['type'] ?? json['bag_type'],
-        fallback: 'Whole Blood / PRBC',
+        fallback: 'Blood / PRBC',
       ),
       availableBags: bags,
       status: JsonParsers.asString(
         json['status'],
-        fallback: bags > 0 ? 'Available' : 'Out of Stock',
+        fallback: bags > 0 ? 'Available' : '0 Bags',
       ),
     );
+  }
+
+  /// Parses any real backend `/api/blood-bank` response shape:
+  /// 1. List of group summaries (`[{ blood_group: 'A+', available_bags: 4 }]`)
+  /// 2. List of individual blood bag records (`[{ blood_group: 'A+', bag_no: '101', status: 'Available' }]`)
+  /// 3. Key-value summary map (`{ "A+": 4, "B+": 2, ... }`)
+  static List<BloodBankGroupItem> parseFlexible(dynamic raw) {
+    final list = JsonParsers.extractList(raw);
+    if (list.isNotEmpty) {
+      // Check if items represent individual bags (have bag_no/donor and no aggregate count field)
+      final looksLikeIndividualBags = list.any(
+        (m) =>
+            (m.containsKey('bag_no') || m.containsKey('donor')) &&
+            !m.containsKey('available_bags') &&
+            !m.containsKey('bags') &&
+            !m.containsKey('count'),
+      );
+      if (looksLikeIndividualBags) {
+        final grouped = <String, int>{};
+        for (final bag in list) {
+          final grp = JsonParsers.asString(
+            bag['blood_group'] ?? bag['group'],
+          );
+          if (grp.isEmpty) continue;
+          final st = JsonParsers.asString(bag['status']).toLowerCase();
+          final available = st.isEmpty ||
+              st == 'available' ||
+              st == 'in stock' ||
+              st == 'active';
+          grouped[grp] = (grouped[grp] ?? 0) + (available ? 1 : 0);
+        }
+        return grouped.entries
+            .map(
+              (e) => BloodBankGroupItem(
+                id: e.key,
+                bloodGroup: e.key,
+                componentType: 'Blood / Component Bags',
+                availableBags: e.value,
+                status: e.value > 0 ? 'Available' : '0 Bags',
+              ),
+            )
+            .toList();
+      }
+      return list.map(BloodBankGroupItem.fromJson).toList();
+    }
+
+    final obj = JsonParsers.extractObject(raw);
+    const stdGroups = <String>[
+      'A+',
+      'A-',
+      'B+',
+      'B-',
+      'AB+',
+      'AB-',
+      'O+',
+      'O-',
+    ];
+    final mapSource = obj['stock'] is Map
+        ? JsonParsers.asMap(obj['stock'])
+        : (obj['groups'] is Map ? JsonParsers.asMap(obj['groups']) : obj);
+    final extracted = <BloodBankGroupItem>[];
+    for (final grp in stdGroups) {
+      if (mapSource.containsKey(grp)) {
+        final v = mapSource[grp];
+        final cnt = v is Map
+            ? JsonParsers.asInt(v['available'] ?? v['bags'] ?? v['count'])
+            : JsonParsers.asInt(v);
+        extracted.add(
+          BloodBankGroupItem(
+            id: grp,
+            bloodGroup: grp,
+            componentType: 'Blood Units',
+            availableBags: cnt,
+            status: cnt > 0 ? 'Available' : '0 Bags',
+          ),
+        );
+      }
+    }
+    return extracted;
   }
 }
 
@@ -350,6 +430,60 @@ class ServerNotificationItem {
       ),
       type: JsonParsers.asString(json['type'], fallback: 'clinical'),
       isRead: JsonParsers.asBool(json['is_read'] ?? json['read']),
+      createdAt: JsonParsers.asDateTime(json['createdAt'] ?? json['date']),
+    );
+  }
+}
+
+class AbhaScanCheckinItem {
+  final String id;
+  final String tokenNumber;
+  final String patientName;
+  final String abhaNumber;
+  final String abhaAddress;
+  final String gender;
+  final String mobile;
+  final String status; // pending | checked_in | completed
+  final DateTime? createdAt;
+
+  const AbhaScanCheckinItem({
+    required this.id,
+    required this.tokenNumber,
+    required this.patientName,
+    required this.abhaNumber,
+    required this.abhaAddress,
+    required this.gender,
+    required this.mobile,
+    required this.status,
+    this.createdAt,
+  });
+
+  bool get isPending {
+    final s = status.trim().toLowerCase();
+    return s.isEmpty ||
+        s == 'pending' ||
+        s == 'waiting' ||
+        s == 'queued' ||
+        s == 'scanned';
+  }
+
+  factory AbhaScanCheckinItem.fromJson(Map<String, dynamic> json) {
+    return AbhaScanCheckinItem(
+      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      tokenNumber: JsonParsers.asString(
+        json['token_no'] ?? json['token'] ?? json['queue_no'],
+      ),
+      patientName: JsonParsers.asString(
+        json['patient_name'] ?? json['name'],
+        fallback: 'ABHA Patient',
+      ),
+      abhaNumber: JsonParsers.asString(json['abha_number'] ?? json['abha_no']),
+      abhaAddress: JsonParsers.asString(json['abha_address']),
+      gender: JsonParsers.asString(json['gender']),
+      mobile: JsonParsers.asString(
+        json['mobile'] ?? json['mobileno'] ?? json['phone'],
+      ),
+      status: JsonParsers.asString(json['status'], fallback: 'pending'),
       createdAt: JsonParsers.asDateTime(json['createdAt'] ?? json['date']),
     );
   }

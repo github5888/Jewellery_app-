@@ -39,6 +39,8 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
         return st.contains('sched');
       case 'Completed':
         return st.contains('comp') || st.contains('done');
+      case 'Cancelled':
+        return st.contains('cancel') || st.contains('noshow');
       default:
         return true;
     }
@@ -49,6 +51,15 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
     final controller = NursePortalScope.of(context);
     final allOpd = controller.opdQueue;
     final q = _searchCtrl.text.trim().toLowerCase();
+
+    final waitingCount =
+        allOpd.where((o) => _matchesTab(o, 'Waiting')).length;
+    final inConsultCount =
+        allOpd.where((o) => _matchesTab(o, 'In Consultation')).length;
+    final scheduledCount =
+        allOpd.where((o) => _matchesTab(o, 'Scheduled')).length;
+    final completedCount =
+        allOpd.where((o) => _matchesTab(o, 'Completed')).length;
 
     final filtered = allOpd.where((o) {
       if (!_matchesTab(o, _statusTab)) return false;
@@ -62,11 +73,49 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(title: const Text('OPD Triage Queue')),
+      appBar: AppBar(title: Text('OPD Triage (${allOpd.length})')),
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 6, 18, 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _OpdKpiBox(
+                    label: 'Waiting',
+                    value: '$waitingCount',
+                    color: AppColors.warning,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _OpdKpiBox(
+                    label: 'Consult',
+                    value: '$inConsultCount',
+                    color: AppColors.purple,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _OpdKpiBox(
+                    label: 'Scheduled',
+                    value: '$scheduledCount',
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _OpdKpiBox(
+                    label: 'Completed',
+                    value: '$completedCount',
+                    color: AppColors.success,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 10),
             child: TextField(
               controller: _searchCtrl,
               onChanged: (_) => setState(() {}),
@@ -81,18 +130,19 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 18),
             child: Row(
               children: [
-                'All',
-                'Waiting',
-                'In Consultation',
-                'Scheduled',
-                'Completed',
-              ].map((t) {
+                ('All', 'All (${allOpd.length})'),
+                ('Waiting', 'Waiting ($waitingCount)'),
+                ('In Consultation', 'In Consultation ($inConsultCount)'),
+                ('Scheduled', 'Scheduled ($scheduledCount)'),
+                ('Completed', 'Completed ($completedCount)'),
+                ('Cancelled', 'Cancelled'),
+              ].map((entry) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: _TabButtonChip(
-                    label: t,
-                    selected: _statusTab == t,
-                    onTap: () => setState(() => _statusTab = t),
+                    label: entry.$2,
+                    selected: _statusTab == entry.$1,
+                    onTap: () => setState(() => _statusTab = entry.$1),
                   ),
                 );
               }).toList(),
@@ -235,6 +285,48 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
                         );
                       },
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OpdKpiBox extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _OpdKpiBox({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SoftSurfaceCard(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],

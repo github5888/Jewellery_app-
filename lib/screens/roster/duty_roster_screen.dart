@@ -137,6 +137,15 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
                           spacing: 12,
                           runSpacing: 6,
                           children: [
+                            if (s.staffCode.isNotEmpty)
+                              Text(
+                                '#${s.staffCode.replaceFirst('#', '')}',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             if (s.role.isNotEmpty)
                               Text(
                                 s.role,
@@ -163,30 +172,41 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.location_on_outlined,
-                              size: 15,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              [
-                                s.department,
-                                if (s.floor.isNotEmpty) s.floor,
-                              ].join(' • '),
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
+                            if (s.shiftHour.isNotEmpty)
+                              Text(
+                                s.shiftHour,
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
-                            ),
                           ],
                         ),
+                        if (s.department.isNotEmpty || s.floor.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 15,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                [
+                                  if (s.department.isNotEmpty) s.department,
+                                  if (s.floor.isNotEmpty) s.floor,
+                                ].join(' • '),
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ],
                     ),
                   ),

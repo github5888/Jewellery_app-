@@ -695,7 +695,9 @@ class IpdAdmission {
   final String ipdNo;
   final String caseReferenceId;
   final DateTime? admissionDate;
+  final DateTime? dischargeDate;
   final String dischargeStatus;
+  final bool isDischargedFlag;
   final String bed;
   final String bedId;
   final String bedGroup;
@@ -723,7 +725,9 @@ class IpdAdmission {
     required this.ipdNo,
     required this.caseReferenceId,
     this.admissionDate,
+    this.dischargeDate,
     required this.dischargeStatus,
+    this.isDischargedFlag = false,
     required this.bed,
     required this.bedId,
     required this.bedGroup,
@@ -746,6 +750,24 @@ class IpdAdmission {
     required this.dischargeChecklist,
   });
 
+  /// Accurately detects whether an IPD record is discharged across all backend conventions:
+  /// `discharge_status` ('discharged' / 'yes'), `status` ('Discharged'), `is_discharged` (true), or `discharge_date`.
+  bool get isDischarged {
+    if (isDischargedFlag) return true;
+    final ds = dischargeStatus.trim().toLowerCase();
+    if (ds == 'discharged' ||
+        ds == 'yes' ||
+        ds == 'true' ||
+        ds == '1' ||
+        ds == 'completed') {
+      return true;
+    }
+    if (ds == 'admitted' || ds == 'no' || ds == 'active' || ds == 'false' || ds == '0') {
+      return false;
+    }
+    return dischargeDate != null;
+  }
+
   VitalSignRecord? get latestVital {
     if (vitals.isEmpty) return null;
     final sorted = List<VitalSignRecord>.from(vitals);
@@ -759,16 +781,16 @@ class IpdAdmission {
 
   String get wardAndBedLabel {
     if (bedGroup.isNotEmpty && bed.isNotEmpty) {
-      return '$bedGroup • $bed';
+      return '$bedGroup / $bed';
     }
     if (bed.isNotEmpty) return bed;
     if (bedGroup.isNotEmpty) return bedGroup;
-    return 'IPD Ward';
+    return 'Unassigned Bed';
   }
 
   /// Computes clinical badge label directly from real patient status, emergency flags, and latest vitals.
   String get clinicalStatusLabel {
-    if (dischargeStatus.toLowerCase() == 'discharged') return 'Discharged';
+    if (isDischarged) return 'Discharged';
     final lv = latestVital;
     if (isCasualty ||
         admissionType.toLowerCase() == 'emergency' ||
@@ -857,6 +879,16 @@ class IpdAdmission {
         ? JsonParsers.asMap(json['discharge_checklist'])
         : <String, dynamic>{};
 
+    final rawDischargeStatus = JsonParsers.asString(
+      json['discharge_status'] ?? json['status'],
+    );
+    final dischargedBool = JsonParsers.asBool(
+      json['is_discharged'] ?? json['discharged'],
+    );
+    final dischargeDt = JsonParsers.asDateTime(
+      json['discharge_date'] ?? json['discharged_at'],
+    );
+
     return IpdAdmission(
       id: id,
       ipdNo: JsonParsers.asString(json['ipd_no'], fallback: id),
@@ -864,10 +896,11 @@ class IpdAdmission {
       admissionDate: JsonParsers.asDateTime(
         json['admission_date'] ?? json['date'] ?? json['createdAt'],
       ),
-      dischargeStatus: JsonParsers.asString(
-        json['discharge_status'],
-        fallback: 'admitted',
-      ),
+      dischargeDate: dischargeDt,
+      dischargeStatus: rawDischargeStatus.isNotEmpty
+          ? rawDischargeStatus
+          : (dischargedBool ? 'discharged' : 'admitted'),
+      isDischargedFlag: dischargedBool,
       bed: bedName,
       bedId: bedId,
       bedGroup: bedGroupName,

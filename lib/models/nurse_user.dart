@@ -131,14 +131,8 @@ class NurseUser {
         source['role_name'] ?? source['role'],
         fallback: 'Nurse',
       ),
-      designation: JsonParsers.asString(
-        source['designation'],
-        fallback: 'Registered Ward Nurse',
-      ),
-      department: JsonParsers.asString(
-        source['department'],
-        fallback: 'In-Patient Nursing & Ward Care',
-      ),
+      designation: JsonParsers.asString(source['designation']),
+      department: JsonParsers.asString(source['department']),
       image: img.isEmpty ? null : img,
       hospitalId: hospitalId,
       hospitalInfo: parsedHospital,

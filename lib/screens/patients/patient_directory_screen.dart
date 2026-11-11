@@ -27,7 +27,16 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final cached = NursePortalScope.read(context).patientDirectory;
+      if (cached.isNotEmpty) {
+        setState(() {
+          _patients = cached;
+          _loading = false;
+        });
+      }
+      _load();
+    });
   }
 
   @override

@@ -29,30 +29,10 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
   final _searchCtrl = TextEditingController();
   _PatientsFilter _filter = _PatientsFilter.all;
 
-  List<IpdAdmission> _dischargedIpd = const [];
-  bool _loadingDischarged = false;
-
   @override
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadDischargedIfNeeded() async {
-    setState(() => _loadingDischarged = true);
-    try {
-      final list = await NursePortalScope.read(context)
-          .api
-          .fetchIpdAdmissions(dischargeStatus: 'discharged');
-      if (mounted) {
-        setState(() => _dischargedIpd = list);
-      }
-    } catch (_) {
-    } finally {
-      if (mounted) {
-        setState(() => _loadingDischarged = false);
-      }
-    }
   }
 
   @override
@@ -78,7 +58,7 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
           opd.doctorName.toLowerCase().contains(query);
     }).toList();
 
-    final dischargedFiltered = _dischargedIpd.where((ipd) {
+    final dischargedFiltered = controller.dischargedPatients.where((ipd) {
       if (query.isEmpty) return true;
       return ipd.patient.patientName.toLowerCase().contains(query) ||
           ipd.patient.patientUniqueId.toLowerCase().contains(query) ||
@@ -181,14 +161,10 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
                 ),
                 const SizedBox(width: 8),
                 _FilterPill(
-                  label: 'Discharged',
+                  label: 'Discharged (${controller.dischargedPatients.length})',
                   selected: _filter == _PatientsFilter.discharged,
-                  onTap: () {
-                    setState(() => _filter = _PatientsFilter.discharged);
-                    if (_dischargedIpd.isEmpty && !_loadingDischarged) {
-                      _loadDischargedIfNeeded();
-                    }
-                  },
+                  onTap: () =>
+                      setState(() => _filter = _PatientsFilter.discharged),
                 ),
               ],
             ),
@@ -199,12 +175,7 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primary,
-              onRefresh: () async {
-                await controller.refreshWorkspace();
-                if (_filter == _PatientsFilter.discharged) {
-                  await _loadDischargedIfNeeded();
-                }
-              },
+              onRefresh: () => controller.refreshWorkspace(),
               child: _buildFilteredList(
                 context: context,
                 controller: controller,
@@ -227,18 +198,16 @@ class _MyPatientsScreenState extends State<MyPatientsScreen> {
     required List<IpdAdmission> discharged,
   }) {
     if (_filter == _PatientsFilter.discharged) {
-      if (_loadingDischarged) {
-        return const Center(child: CircularProgressIndicator());
-      }
       if (discharged.isEmpty) {
         return ListView(
           children: [
             ClinicalEmptyState(
               icon: Icons.fact_check_outlined,
               title: 'No Discharged IPD Records Found',
-              subtitle: 'Discharged in-patient records from /api/ipd will appear here.',
+              subtitle:
+                  'Discharged in-patient records from /api/ipd will appear here.',
               actionLabel: 'Refresh',
-              onAction: _loadDischargedIfNeeded,
+              onAction: () => controller.refreshWorkspace(),
             ),
           ],
         );

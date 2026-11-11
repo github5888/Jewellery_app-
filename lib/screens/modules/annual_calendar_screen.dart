@@ -54,11 +54,26 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final todayStart = DateTime(now.year, now.month, now.day);
+    final tomorrowStart = todayStart.add(const Duration(days: 1));
+
+    bool isToday(HospitalHolidayItem h) =>
+        h.fromDate != null &&
+        !h.fromDate!.isBefore(todayStart) &&
+        h.fromDate!.isBefore(tomorrowStart);
+    bool isPast(HospitalHolidayItem h) =>
+        h.fromDate != null && h.fromDate!.isBefore(todayStart);
+    bool isUpcoming(HospitalHolidayItem h) =>
+        h.fromDate != null && !h.fromDate!.isBefore(todayStart);
+
+    final upcomingCount = _holidays.where(isUpcoming).length;
+    final todayCount = _holidays.where(isToday).length;
+    final pastCount = _holidays.where(isPast).length;
 
     final filtered = _holidays.where((h) {
       if (_filter == 'All' || h.fromDate == null) return true;
-      if (_filter == 'Past') return h.fromDate!.isBefore(todayStart);
-      return !h.fromDate!.isBefore(todayStart);
+      if (_filter == 'Today') return isToday(h);
+      if (_filter == 'Past') return isPast(h);
+      return isUpcoming(h);
     }).toList();
 
     return Scaffold(
@@ -66,17 +81,23 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
       appBar: AppBar(title: Text('Annual Calendar (${_holidays.length})')),
       body: Column(
         children: [
-          Padding(
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.fromLTRB(18, 8, 18, 12),
             child: Row(
-              children: ['All', 'Upcoming', 'Past'].map((tab) {
-                final active = _filter == tab;
+              children: [
+                ('Upcoming', 'Upcoming ($upcomingCount)'),
+                ('Today', 'Today ($todayCount)'),
+                ('Past', 'Past ($pastCount)'),
+                ('All', 'All Holidays (${_holidays.length})'),
+              ].map((entry) {
+                final active = _filter == entry.$1;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
-                    label: Text(tab),
+                    label: Text(entry.$2),
                     selected: active,
-                    onSelected: (_) => setState(() => _filter = tab),
+                    onSelected: (_) => setState(() => _filter = entry.$1),
                   ),
                 );
               }).toList(),

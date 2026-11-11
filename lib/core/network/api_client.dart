@@ -295,7 +295,7 @@ class ApiClient {
   }) async {
     final fullUrl =
         AppConfig.resolveAuthenticatedReportUrl(_baseUrl, rawReportPath);
-    final uri = Uri.parse(fullUrl);
+    final uri = _buildUri(fullUrl);
     try {
       final response = await _http
           .get(

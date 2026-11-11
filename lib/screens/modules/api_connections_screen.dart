@@ -58,8 +58,8 @@ class _ApiConnectionsScreenState extends State<ApiConnectionsScreen> {
       ),
       _EndpointSpec(
         method: 'GET',
-        label: 'Admitted IPD Ward Patients',
-        fullUrl: '${ep.ipdList}?discharge_status=admitted',
+        label: 'All IPD Admissions & Discharges',
+        fullUrl: ep.ipdList,
       ),
       _EndpointSpec(
         method: 'GET',
@@ -123,12 +123,17 @@ class _ApiConnectionsScreenState extends State<ApiConnectionsScreen> {
       _EndpointSpec(
         method: 'GET',
         label: 'Nurse Duty Roster & Shifts',
-        fullUrl: ep.dutyRosterAssignments,
+        fullUrl: ep.dutyRoster,
       ),
       _EndpointSpec(
         method: 'GET',
         label: 'Patient Master Directory',
         fullUrl: ep.patients,
+      ),
+      _EndpointSpec(
+        method: 'GET',
+        label: 'ABHA Scan & Share Check-ins',
+        fullUrl: ep.abhaScanShare,
       ),
       _EndpointSpec(
         method: 'GET',

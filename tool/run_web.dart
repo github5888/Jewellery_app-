@@ -25,6 +25,7 @@ Future<void> main(List<String> args) async {
       'run',
       '-d',
       'chrome',
+      '--dart-define=USE_WEB_PROXY=true',
       ...args,
     ],
     mode: ProcessStartMode.inheritStdio,

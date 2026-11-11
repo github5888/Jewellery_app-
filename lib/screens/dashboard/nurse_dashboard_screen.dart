@@ -591,6 +591,129 @@ class NurseDashboardScreen extends StatelessWidget {
                       ),
                     ),
 
+                  // Live ABHA Scan & Share Check-ins Banner (matches Website Screenshot 717)
+                  if (controller.pendingAbhaCount > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: SoftSurfaceCard(
+                        color: AppColors.warningSoft,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const OpdTriageScreen(),
+                            ),
+                          );
+                        },
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.qr_code_scanner_rounded,
+                              color: AppColors.warning,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                '${controller.pendingAbhaCount} pending ABHA Scan & Share check-ins',
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            const Text(
+                              'Open Queue →',
+                              style: TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // Live Hospital Census Summary (exact numbers from /api/patients, /api/ipd, /api/opd, /api/dashboard)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 18),
+                    child: SoftSurfaceCard(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _MiniCensusStat(
+                              label: 'Total Patients',
+                              value: '${controller.totalPatientsCount}',
+                              color: AppColors.primary,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        const PatientDirectoryScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 28,
+                            color: AppColors.border,
+                          ),
+                          Expanded(
+                            child: _MiniCensusStat(
+                              label: 'OPD Patients',
+                              value: '${controller.opdPatientsCount}',
+                              color: AppColors.teal,
+                              onTap: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const OpdTriageScreen(),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 28,
+                            color: AppColors.border,
+                          ),
+                          Expanded(
+                            child: _MiniCensusStat(
+                              label: 'Discharged',
+                              value: '${controller.dischargedPatientsCount}',
+                              color: AppColors.warning,
+                              onTap: () => controller.setSelectedNavIndex(1),
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            height: 28,
+                            color: AppColors.border,
+                          ),
+                          Expanded(
+                            child: _MiniCensusStat(
+                              label: 'Tasks Due',
+                              value: '${controller.pendingNursingTasksCount}',
+                              color: AppColors.purple,
+                              onTap: () => controller.setSelectedNavIndex(2),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
                   // Quick Actions Section (6-Grid matching image-2.png)
                   const Text(
                     'Quick Actions',
@@ -929,86 +1052,151 @@ class NurseDashboardScreen extends StatelessWidget {
                           ),
                         ),
 
-                  // Recent Clinical Activity Live Feed (from GET /api/dashboard `recentActivity`)
-                  if (dash != null && dash.recentActivity.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    const Text(
-                      'Recent Patient Clinical Activity',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  // Recent Patient Clinical Activity Live Feed (matches Website Screenshot 720)
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Recent Patient Clinical Activity',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
                     ),
-                    const SizedBox(height: 10),
-                    SoftSurfaceCard(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 10,
-                      ),
-                      child: Column(
-                        children: dash.recentActivity
-                            .take(5)
-                            .map(
-                              (act) => Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 7),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Container(
-                                      width: 34,
-                                      height: 34,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.skySurface,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(
-                                        Icons.history_edu_rounded,
-                                        color: AppColors.primary,
-                                        size: 18,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            act.title,
-                                            style: const TextStyle(
-                                              color: AppColors.textPrimary,
-                                              fontSize: 13.5,
-                                              fontWeight: FontWeight.w700,
-                                            ),
-                                          ),
-                                          if (act.description.isNotEmpty)
-                                            Text(
-                                              act.description,
-                                              style: const TextStyle(
-                                                color: AppColors.textSecondary,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                        ],
-                                      ),
-                                    ),
-                                    Text(
-                                      AppFormatters.timeAgo(act.timestamp),
-                                      style: const TextStyle(
-                                        color: AppColors.textMuted,
-                                        fontSize: 11,
-                                      ),
-                                    ),
-                                  ],
+                  ),
+                  const SizedBox(height: 10),
+                  SoftSurfaceCard(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                    child: (dash == null || dash.recentActivity.isEmpty)
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(vertical: 8),
+                              child: Text(
+                                'No recent vitals or nursing notes recorded today yet.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.textMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            )
-                            .toList(),
-                      ),
-                    ),
-                  ],
+                            ),
+                          )
+                        : Column(
+                            children: dash.recentActivity
+                                .take(5)
+                                .map(
+                                  (act) => Padding(
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 7),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          width: 34,
+                                          height: 34,
+                                          decoration: const BoxDecoration(
+                                            color: AppColors.skySurface,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.history_edu_rounded,
+                                            color: AppColors.primary,
+                                            size: 18,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                act.title,
+                                                style: const TextStyle(
+                                                  color: AppColors.textPrimary,
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                              if (act.description.isNotEmpty)
+                                                Text(
+                                                  act.description,
+                                                  style: const TextStyle(
+                                                    color:
+                                                        AppColors.textSecondary,
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Text(
+                                          AppFormatters.timeAgo(act.timestamp),
+                                          style: const TextStyle(
+                                            color: AppColors.textMuted,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                  ),
                 ]),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MiniCensusStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MiniCensusStat({
+    required this.label,
+    required this.value,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ],

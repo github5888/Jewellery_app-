@@ -32,13 +32,12 @@ class PendingVitalItem {
       ipdNo: JsonParsers.asString(json['ipd_no']),
       patientName: JsonParsers.asString(
         json['patient_name'] ?? patientMap['patient_name'] ?? patientMap['name'],
-        fallback: 'Admitted Patient',
       ),
       patientUniqueId: JsonParsers.asString(
         json['patient_unique_id'] ?? patientMap['patient_unique_id'],
       ),
-      bed: JsonParsers.asString(json['bed'] ?? json['bed_name'], fallback: 'Ward Bed'),
-      ward: JsonParsers.asString(json['bed_group'] ?? json['ward'], fallback: 'IPD Ward'),
+      bed: JsonParsers.asString(json['bed'] ?? json['bed_name']),
+      ward: JsonParsers.asString(json['bed_group'] ?? json['ward']),
       doctorName: JsonParsers.asString(
         json['doctor_name'] ?? doctorMap['name'],
       ),
@@ -75,10 +74,14 @@ class ClinicalActivityItem {
     );
     final title = JsonParsers.asString(
       json['title'] ?? json['summary'] ?? json['label'],
-      fallback: patientName.isNotEmpty ? 'Care Update • $patientName' : 'Clinical Update',
+      fallback: patientName.isNotEmpty ? patientName : 'Clinical Update',
     );
     final desc = JsonParsers.asString(
-      json['description'] ?? json['note'] ?? json['notes'] ?? json['message'] ?? json['details'],
+      json['description'] ??
+          json['note'] ??
+          json['notes'] ??
+          json['message'] ??
+          json['details'],
     );
     return ClinicalActivityItem(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
@@ -87,10 +90,16 @@ class ClinicalActivityItem {
       description: desc,
       patientName: patientName,
       nurseName: JsonParsers.asString(
-        json['recorded_by'] ?? json['nurse_name'] ?? json['added_by'] ?? json['staff_name'],
+        json['recorded_by'] ??
+            json['nurse_name'] ??
+            json['added_by'] ??
+            json['staff_name'],
       ),
       timestamp: JsonParsers.asDateTime(
-        json['date'] ?? json['createdAt'] ?? json['timestamp'] ?? json['administered_at'],
+        json['date'] ??
+            json['createdAt'] ??
+            json['timestamp'] ??
+            json['administered_at'],
       ),
     );
   }
@@ -127,61 +136,95 @@ class NurseDashboardData {
 
   double get bedOccupancyRatio {
     if (totalBeds <= 0) return 0.0;
-    final ratio = occupiedBeds / totalBeds;
-    if (ratio < 0) return 0.0;
-    if (ratio > 1) return 1.0;
-    return ratio;
+    return (occupiedBeds / totalBeds).clamp(0.0, 1.0);
   }
 
   int get bedOccupancyPercent => (bedOccupancyRatio * 100).round();
 
   factory NurseDashboardData.fromJson(Map<String, dynamic> raw) {
     final json = JsonParsers.extractObject(raw);
-    final stats = json['stats'] is Map ? JsonParsers.asMap(json['stats']) : <String, dynamic>{};
-    final counts = json['counts'] is Map ? JsonParsers.asMap(json['counts']) : <String, dynamic>{};
+    final subMaps = <Map<String, dynamic>>[
+      json,
+      if (json['stats'] is Map) JsonParsers.asMap(json['stats']),
+      if (json['counts'] is Map) JsonParsers.asMap(json['counts']),
+      if (json['summary'] is Map) JsonParsers.asMap(json['summary']),
+      if (json['kpis'] is Map) JsonParsers.asMap(json['kpis']),
+      if (json['nurse'] is Map) JsonParsers.asMap(json['nurse']),
+      if (json['ward'] is Map) JsonParsers.asMap(json['ward']),
+      raw,
+    ];
 
-    int pickInt(List<String> keys) {
-      for (final k in keys) {
-        final v = json[k] ?? stats[k] ?? counts[k] ?? raw[k];
-        if (v != null) return JsonParsers.asInt(v);
+    final bedSubMap = json['bedStats'] is Map
+        ? JsonParsers.asMap(json['bedStats'])
+        : (json['beds'] is Map
+            ? JsonParsers.asMap(json['beds'])
+            : <String, dynamic>{});
+
+    int? pickOptionalInt(List<String> keys) {
+      for (final m in subMaps) {
+        for (final k in keys) {
+          final v = m[k];
+          if (v != null && v is! Map && v is! List) {
+            return JsonParsers.asInt(v);
+          }
+        }
       }
-      return 0;
+      return null;
     }
 
-    final pendingListRaw = json['pendingVitalsRecords'] ??
-        stats['pendingVitalsRecords'] ??
-        raw['pendingVitalsRecords'];
-    final pendingRecords = JsonParsers.asMapList(pendingListRaw)
-        .map(PendingVitalItem.fromJson)
-        .toList();
+    int pickInt(List<String> keys) => pickOptionalInt(keys) ?? 0;
 
-    final activityListRaw = json['recentActivity'] ??
-        json['recentClinicalActivity'] ??
-        stats['recentActivity'] ??
-        raw['recentActivity'];
-    final activity = JsonParsers.asMapList(activityListRaw)
-        .map(ClinicalActivityItem.fromJson)
-        .toList();
+    dynamic findRawList(List<String> keys) {
+      for (final m in subMaps) {
+        for (final k in keys) {
+          if (m[k] is List) return m[k];
+        }
+      }
+      return null;
+    }
 
-    final totalBeds = pickInt(const ['totalBeds', 'total_beds']);
-    final occupiedBeds = pickInt(const ['occupiedBeds', 'occupied_beds']);
-    final availableBeds = (json['availableBeds'] != null || stats['availableBeds'] != null)
-        ? pickInt(const ['availableBeds', 'available_beds'])
-        : (totalBeds >= occupiedBeds ? totalBeds - occupiedBeds : 0);
+    final pendingRecords = JsonParsers.asMapList(
+      findRawList(const ['pendingVitalsRecords', 'pending_vitals_records']),
+    ).map(PendingVitalItem.fromJson).toList();
 
-    final pendingVitalsCount = (json['pendingVitalsCount'] != null ||
-            stats['pendingVitalsCount'] != null)
-        ? pickInt(const ['pendingVitalsCount', 'pending_vitals'])
-        : pendingRecords.length;
+    final activity = JsonParsers.asMapList(
+      findRawList(const [
+        'recentActivity',
+        'recentClinicalActivity',
+        'recent_activity',
+        'clinicalActivity',
+      ]),
+    ).map(ClinicalActivityItem.fromJson).toList();
+
+    final totalBeds = pickOptionalInt(const ['totalBeds', 'total_beds']) ??
+        JsonParsers.asInt(bedSubMap['total'] ?? bedSubMap['totalBeds']);
+    final occupiedBeds =
+        pickOptionalInt(const ['occupiedBeds', 'occupied_beds']) ??
+            JsonParsers.asInt(bedSubMap['occupied'] ?? bedSubMap['occupiedBeds']);
+    final explicitAvail =
+        pickOptionalInt(const ['availableBeds', 'available_beds']) ??
+            (bedSubMap['available'] != null
+                ? JsonParsers.asInt(bedSubMap['available'])
+                : null);
+    final availableBeds = explicitAvail ??
+        (totalBeds >= occupiedBeds ? totalBeds - occupiedBeds : 0);
+
+    final pendingVitalsCount = pickOptionalInt(const [
+          'pendingVitalsCount',
+          'pendingVitals',
+          'pending_vitals',
+        ]) ??
+        pendingRecords.length;
 
     final medsDue = pickInt(const [
       'medicationsDueCount',
-      'medications_due',
       'medicationsDue',
+      'medications_due',
     ]);
 
-    final pendingTasks = pickInt(const [
+    final pendingTasks = pickOptionalInt(const [
       'pendingNursingTasks',
+      'pendingNursingTasksCount',
       'pendingTasksCount',
       'pending_nursing_tasks',
     ]);
@@ -190,14 +233,26 @@ class NurseDashboardData {
       currentlyAdmitted: pickInt(const [
         'currentlyAdmitted',
         'admittedPatients',
+        'activeIpd',
         'ipdAdmittedCount',
         'ipdCount',
       ]),
-      totalPatients: pickInt(const ['totalPatients', 'patientsCount', 'total_patients']),
-      opdPatients: pickInt(const ['opdPatients', 'opdCount', 'totalOpd']),
+      totalPatients: pickInt(const [
+        'totalPatients',
+        'patientsCount',
+        'patientCount',
+        'total_patients',
+      ]),
+      opdPatients: pickInt(const [
+        'opdPatients',
+        'opdCount',
+        'totalOpd',
+        'opd_patients',
+      ]),
       dischargedPatients: pickInt(const [
         'dischargedPatients',
         'dischargedCount',
+        'dischargedIpd',
         'totalDischarged',
       ]),
       totalBeds: totalBeds,
@@ -205,8 +260,7 @@ class NurseDashboardData {
       availableBeds: availableBeds,
       pendingVitalsCount: pendingVitalsCount,
       medicationsDueCount: medsDue,
-      pendingNursingTasksCount:
-          pendingTasks > 0 ? pendingTasks : (pendingVitalsCount + medsDue),
+      pendingNursingTasksCount: pendingTasks ?? (pendingVitalsCount + medsDue),
       pendingVitalsRecords: pendingRecords,
       recentActivity: activity,
     );
