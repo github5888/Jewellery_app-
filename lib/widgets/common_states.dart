@@ -51,6 +51,44 @@ class SoftSurfaceCard extends StatelessWidget {
   }
 }
 
+class ClinicalLoadingState extends StatelessWidget {
+  final String message;
+
+  const ClinicalLoadingState({
+    super.key,
+    this.message = 'Loading live hospital data...',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 30,
+              height: 30,
+              child: CircularProgressIndicator(strokeWidth: 2.8),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ClinicalEmptyState extends StatelessWidget {
   final IconData icon;
   final String title;
