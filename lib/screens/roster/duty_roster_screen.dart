@@ -6,12 +6,11 @@ import '../../models/duty_roster_model.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Native Mobile Staff Duty Roster Screen (`GET /api/dutyroster`):
-/// - Clean `MobileScreenHeader` + `Read-Only` pill
-/// - 4-Column Shift Summary Strip (`Total`, `Morning`, `Evening`, `Night`)
-/// - View Pills (`Today` default, `Date-wise`, `Monthly`, `All Records`)
-/// - Dropdown Filters (`All Departments`, `All Shifts`, `All Roles`, `All Staff`)
-/// - Search (`Search staff, ID, department...`) + Floating white Roster Cards.
+/// Executive Mobile Staff Duty Roster Screen (`GET /api/dutyroster`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `Read-Only` capsule
+/// - 4-Column Shift Telemetry Strip (`Total`, `Morning`, `Evening`, `Night`)
+/// - Capsule View Pills (`Today`, `Date-wise`, `Monthly`, `All Records`)
+/// - `PremiumSearchField` + Elevated Filter Pills + Sculpted Staff Roster Pass Cards.
 class DutyRosterScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -160,12 +159,12 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
               subtitle: 'Hospital shift allocation & staff schedule',
               countBadge: '$totalOnDuty On Duty',
               trailingAction: Container(
-                height: 34,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
+                height: 36,
+                padding: const EdgeInsets.symmetric(horizontal: 11),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                 ),
                 child: const Text(
@@ -179,7 +178,7 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
               ),
             ),
 
-          // 4-Column Shift Summary Strip
+          // 4-Column Sculpted Shift Summary Strip
           Row(
             children: [
               Expanded(
@@ -216,9 +215,9 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // View Mode Pills
+          // View Mode Capsule Pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -229,7 +228,7 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
                   primary: primary,
                   onTap: () => setState(() => _viewMode = 'today'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _ViewTabBtn(
                   label: 'Date-wise',
                   selected: _viewMode == 'date',
@@ -247,14 +246,14 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
                     });
                   },
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _ViewTabBtn(
                   label: 'Monthly',
                   selected: _viewMode == 'monthly',
                   primary: primary,
                   onTap: () => setState(() => _viewMode = 'monthly'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _ViewTabBtn(
                   label: 'All Records',
                   selected: _viewMode == 'all',
@@ -265,28 +264,17 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
             ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Search Box
-          TextField(
+          // Elevated Pill Search Bar
+          PremiumSearchField(
             controller: _searchCtrl,
+            accentColor: primary,
+            hintText: 'Search staff name, ID, role or department...',
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Search staff, ID, department...',
-              prefixIcon: Icon(Icons.search_rounded, size: 20, color: primary),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-            ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
           // Filter Dropdowns
           SingleChildScrollView(
@@ -320,7 +308,7 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           if (filtered.isEmpty)
             SoftSurfaceCard(
@@ -341,12 +329,18 @@ class _DutyRosterScreenState extends State<DutyRosterScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: content);
+      return PremiumScreenBackground(
+        accentColor: primary,
+        child: SafeArea(bottom: false, child: content),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Staff Duty Roster')),
-      body: content,
+      body: PremiumScreenBackground(
+        accentColor: primary,
+        child: content,
+      ),
     );
   }
 }
@@ -364,24 +358,21 @@ class _RosterMiniStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
+    return SoftSurfaceCard(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      borderRadius: BorderRadius.circular(18),
       child: Column(
         children: [
           Text(
             value,
             style: TextStyle(
               color: accent,
-              fontSize: 19,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
+              fontFeatures: AppTheme.tabularNums,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             maxLines: 1,
@@ -389,7 +380,7 @@ class _RosterMiniStat extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -416,19 +407,29 @@ class _ViewTabBtn extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? primary : AppColors.border),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: primary.withAlpha(55),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: selected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -450,11 +451,11 @@ class _RosterDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 36,
+      height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(color: AppColors.border),
       ),
       child: DropdownButtonHideUnderline(
@@ -491,33 +492,38 @@ class _DutyRosterCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: SoftSurfaceCard(
-        padding: const EdgeInsets.all(15),
-        borderRadius: BorderRadius.circular(18),
+        padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 44,
+                  height: 44,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(20),
-                    borderRadius: BorderRadius.circular(13),
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor.withAlpha(30),
+                        primaryColor.withAlpha(12),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
                   ),
                   child: Text(
                     entry.initials,
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                const SizedBox(width: 11),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,11 +532,12 @@ class _DutyRosterCard extends StatelessWidget {
                         entry.staffName,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
-                          fontSize: 15,
+                          fontSize: 15.5,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         [
                           if (entry.staffCode.isNotEmpty) '#${entry.staffCode}',
@@ -546,29 +553,33 @@ class _DutyRosterCard extends StatelessWidget {
                   ),
                 ),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4.5,
+                  ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
+                    color: primaryColor.withAlpha(16),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     entry.date.isNotEmpty ? entry.date : '—',
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
+                    style: TextStyle(
+                      color: primaryColor,
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
+                      fontFeatures: AppTheme.tabularNums,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 11),
+            const SizedBox(height: 12),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
               ),
               child: Wrap(
                 spacing: 10,
@@ -576,11 +587,13 @@ class _DutyRosterCard extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.warningSoft,
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(7),
                     ),
                     child: Text(
                       '☀ ${entry.shiftName}',
@@ -613,7 +626,7 @@ class _DutyRosterCard extends StatelessWidget {
               ),
             ),
             if (entry.department.isNotEmpty || entry.floor.isNotEmpty) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 9),
               Row(
                 children: [
                   if (entry.department.isNotEmpty)

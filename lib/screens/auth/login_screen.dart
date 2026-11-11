@@ -6,6 +6,9 @@ import '../../state/nurse_portal_controller.dart';
 import '../../widgets/hospital_brand_logo.dart';
 import '../../widgets/server_config_sheet.dart';
 
+/// Executive Nurse Portal Sign-In Screen:
+/// - Architectural Deep-Sapphire Vault Hero Header with glowing emblem & live server status
+/// - Overlapping Elevated White Credential Card with crisp focus rings & Sign-In CTA.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -68,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
         title: const Row(
           children: [
             Icon(Icons.lock_reset_rounded, color: AppColors.primary),
@@ -106,112 +109,179 @@ class _LoginScreenState extends State<LoginScreen> {
     final hospital = controller.hospitalInfo;
 
     return Scaffold(
-      backgroundColor: Colors.white,
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0xFFE5F0FD),
-              Color(0xFFF6FAFF),
-              Color(0xFFFFFFFF),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              // Top bar with Server Endpoint button & live reachability pill
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: controller.serverReachable
-                            ? AppColors.successSoft
-                            : AppColors.warningSoft,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+      backgroundColor: AppColors.scaffoldBg,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            // 1. Architectural Deep-Sapphire Curved Hero Header
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color(0xFF06162D),
+                    Color(0xFF0E3E6D),
+                    Color(0xFF1B6CA8),
+                  ],
+                ),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(36),
+                ),
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 56),
+                  child: Column(
+                    children: [
+                      // Server Status & Config Row
+                      Row(
                         children: [
                           Container(
-                            width: 7,
-                            height: 7,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 11,
+                              vertical: 5.5,
+                            ),
                             decoration: BoxDecoration(
-                              color: controller.serverReachable
-                                  ? AppColors.success
-                                  : AppColors.warning,
-                              shape: BoxShape.circle,
+                              color: Colors.white.withAlpha(24),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withAlpha(36),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 7,
+                                  height: 7,
+                                  decoration: BoxDecoration(
+                                    color: controller.serverReachable
+                                        ? const Color(0xFF34D399)
+                                        : const Color(0xFFFBBF24),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 7),
+                                Text(
+                                  Uri.tryParse(controller.baseUrl)?.host ??
+                                      controller.baseUrl,
+                                  style: const TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Text(
-                            Uri.tryParse(controller.baseUrl)?.host ??
-                                controller.baseUrl,
-                            style: TextStyle(
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w700,
-                              color: controller.serverReachable
-                                  ? AppColors.success
-                                  : AppColors.warning,
+                          const Spacer(),
+                          IconButton(
+                            tooltip: 'Configure Hospital Server URL',
+                            onPressed: () => showServerConfigSheet(context),
+                            icon: const Icon(
+                              Icons.tune_rounded,
+                              color: Colors.white,
+                              size: 20,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: 'Configure Hospital Server URL',
-                      onPressed: () => showServerConfigSheet(context),
-                      icon: const Icon(
-                        Icons.settings_ethernet_rounded,
-                        color: AppColors.primary,
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(22),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withAlpha(38),
+                          ),
+                        ),
+                        child: const HospitalBrandLogo(size: 56),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 14),
+                      const Text(
+                        'CLINICAL NURSE PORTAL',
+                        style: TextStyle(
+                          color: Color(0xFFBAE6FD),
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        hospital.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 23,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.6,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'Inpatient Ward Care • Vitals • MAR • Bed Matrix',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFFD6E8FA),
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
+            ),
+
+            // 2. Overlapping Floating White Sign-In Vault Card
+            Transform.translate(
+              offset: const Offset(0, -32),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(26),
+                    border: Border.all(color: AppColors.border),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x140F172A),
+                        blurRadius: 32,
+                        offset: Offset(0, 14),
+                      ),
+                    ],
+                  ),
                   child: Form(
                     key: _formKey,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const SizedBox(height: 6),
-                        const HospitalBrandLogo(size: 62),
-                        const SizedBox(height: 12),
                         const Text(
-                          'Nurse Portal',
+                          'Staff Authentication',
                           style: TextStyle(
-                            color: AppColors.primaryDark,
-                            fontSize: 25,
-                            fontWeight: FontWeight.w800,
+                            color: AppColors.textPrimary,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: -0.4,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          'Login to continue • ${hospital.name}',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
+                        const Text(
+                          'Sign in with your assigned hospital nurse credentials',
+                          style: TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 13.5,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        // Clinical Nurse Station Illustration Banner
-                        const _NurseClinicalHeroBanner(),
-                        const SizedBox(height: 22),
+                        const SizedBox(height: 20),
+
                         if (_errorMessage != null) ...[
                           Container(
                             width: double.infinity,
@@ -220,7 +290,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: AppColors.dangerSoft,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: const Color(0xFFF7C4C7),
+                                color: const Color(0xFFFECDD3),
                               ),
                             ),
                             child: Row(
@@ -228,7 +298,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 const Icon(
                                   Icons.error_outline_rounded,
                                   color: AppColors.danger,
-                                  size: 20,
+                                  size: 19,
                                 ),
                                 const SizedBox(width: 8),
                                 Expanded(
@@ -236,26 +306,38 @@ class _LoginScreenState extends State<LoginScreen> {
                                     _errorMessage!,
                                     style: const TextStyle(
                                       color: AppColors.danger,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 16),
                         ],
+
+                        const Text(
+                          'STAFF EMAIL OR ID',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         TextFormField(
                           controller: _usernameCtrl,
                           keyboardType: TextInputType.emailAddress,
                           textInputAction: TextInputAction.next,
                           autocorrect: false,
                           decoration: const InputDecoration(
-                            hintText: 'Staff ID / Email / Mobile No.',
+                            hintText: 'nurse@gmail.com or Staff ID',
                             prefixIcon: Icon(
                               Icons.badge_outlined,
                               color: AppColors.primary,
+                              size: 20,
                             ),
                           ),
                           validator: (v) {
@@ -265,17 +347,29 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 16),
+
+                        const Text(
+                          'PASSWORD',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.7,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
                         TextFormField(
                           controller: _passwordCtrl,
                           obscureText: _obscurePassword,
                           textInputAction: TextInputAction.done,
                           onFieldSubmitted: (_) => _submitLogin(),
                           decoration: InputDecoration(
-                            hintText: 'Password',
+                            hintText: 'Enter account password',
                             prefixIcon: const Icon(
                               Icons.lock_outline_rounded,
                               color: AppColors.primary,
+                              size: 20,
                             ),
                             suffixIcon: IconButton(
                               onPressed: () {
@@ -288,6 +382,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     ? Icons.visibility_outlined
                                     : Icons.visibility_off_outlined,
                                 color: AppColors.textMuted,
+                                size: 20,
                               ),
                             ),
                           ),
@@ -298,20 +393,6 @@ class _LoginScreenState extends State<LoginScreen> {
                             return null;
                           },
                         ),
-                        const SizedBox(height: 22),
-                        ElevatedButton(
-                          onPressed: _submitting ? null : _submitLogin,
-                          child: _submitting
-                              ? const SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.5,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text('Login'),
-                        ),
                         const SizedBox(height: 10),
                         Align(
                           alignment: Alignment.centerRight,
@@ -321,10 +402,50 @@ class _LoginScreenState extends State<LoginScreen> {
                               'Forgot Password?',
                               style: TextStyle(
                                 color: AppColors.primary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 12.5,
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                            onPressed: _submitting ? null : _submitLogin,
+                            child: _submitting
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Sign In to Ward Workspace',
+                                        style: TextStyle(
+                                          fontSize: 14.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 18,
+                                      ),
+                                    ],
+                                  ),
                           ),
                         ),
                       ],
@@ -332,76 +453,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
-              const EcgWaveFooter(height: 68),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+            ),
 
-class _NurseClinicalHeroBanner extends StatelessWidget {
-  const _NurseClinicalHeroBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFDCEBFC),
-            Color(0xFFEFF6FF),
+            const EcgWaveFooter(height: 60),
           ],
         ),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFC8DDF8)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              gradient: AppColors.headerGradient,
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.medical_services_rounded,
-              color: Colors.white,
-              size: 32,
-            ),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'In-Patient Nursing & Ward Desk',
-                  style: TextStyle(
-                    color: AppColors.primaryDark,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Bedside Vitals • MAR Dose Logging • Shift Care Notes • Ward Bed Status',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12.5,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

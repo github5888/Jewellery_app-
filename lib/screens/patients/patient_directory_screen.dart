@@ -6,12 +6,12 @@ import '../../models/patient_directory_model.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Native Mobile Patient Directory Screen (`GET /api/patients`):
-/// - Clean `MobileScreenHeader` (`Patient Directory`, `N Patients`, `Disabled List` toggle)
-/// - Tactile search bar (`Search by name, UHID, mobile, guardian...`)
-/// - Filter pills (`All Genders`, `All Blood Groups`, `Sort: Default`)
-/// - Crisp floating white cards with `#1` index, initials, UHID, ABHA pill, Age/Gender,
-///   Phone + `Shared (N)` detection, Address, `₹0.00` Due Balance, `View` & `ABHA` status.
+/// Executive Mobile Patient Directory Screen (`GET /api/patients`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader`
+/// - `PremiumSearchField` (`Search by name, UHID, mobile, guardian...`)
+/// - Elevated pill filter selectors (`All Genders`, `All Blood Groups`, `Sort`)
+/// - Sculpted Patient Pass Cards with monogram avatar, UHID pill, Blood Group ruby badge,
+///   ABHA verification pill, Shared-Phone detection, Due Balance pill, and Profile Sheet.
 class PatientDirectoryScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -107,27 +107,36 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
         children: [
           if (widget.isEmbeddedInShell)
             MobileScreenHeader(
-              title: _showDisabled ? 'Disabled Patients' : 'Patients',
-              subtitle: 'UHID directory, ABHA & patient records',
+              title: _showDisabled ? 'Archived Patients' : 'Patient Registry',
+              subtitle: 'UHID directory, ABHA & clinical records',
               countBadge: '${filtered.length}',
               trailingAction: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 onTap: () => setState(() => _showDisabled = !_showDisabled),
                 child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 11),
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: _showDisabled ? primary : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: _showDisabled ? primary : AppColors.border,
                     ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x080F172A),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        Icons.person_off_outlined,
+                        _showDisabled
+                            ? Icons.check_circle_outline_rounded
+                            : Icons.person_off_outlined,
                         size: 16,
                         color: _showDisabled
                             ? Colors.white
@@ -141,7 +150,7 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
                               ? Colors.white
                               : AppColors.textPrimary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
@@ -150,45 +159,37 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
               ),
             ),
 
-          // Search Box
-          TextField(
+          // Elevated Pill Search Bar
+          PremiumSearchField(
             controller: _searchCtrl,
+            accentColor: primary,
+            hintText: 'Search name, UHID, mobile or guardian...',
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Search by name, UHID, mobile, guardian...',
-              prefixIcon: Icon(Icons.search_rounded, size: 20, color: primary),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-            ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Filter Dropdown Pills
+          // Elevated Filter Dropdown Pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
                 _FilterDropdownChip(
+                  icon: Icons.wc_rounded,
                   value: _selectedGender,
                   options: _genderOptions,
                   onChanged: (v) => setState(() => _selectedGender = v),
                 ),
                 const SizedBox(width: 8),
                 _FilterDropdownChip(
+                  icon: Icons.water_drop_outlined,
                   value: _selectedBloodGroup,
                   options: _bloodGroupOptions,
                   onChanged: (v) => setState(() => _selectedBloodGroup = v),
                 ),
                 const SizedBox(width: 8),
                 _FilterDropdownChip(
+                  icon: Icons.swap_vert_rounded,
                   prefix: 'Sort: ',
                   value: _selectedSort,
                   options: _sortOptions,
@@ -198,16 +199,16 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           if (filtered.isEmpty)
             SoftSurfaceCard(
               child: ClinicalEmptyState(
                 icon: Icons.groups_outlined,
                 title: _showDisabled
-                    ? 'No Disabled Patients'
-                    : 'No Patients Found',
-                subtitle: 'Try clearing filters or search terms.',
+                    ? 'No Disabled Patient Records'
+                    : 'No Matching Patients Found',
+                subtitle: 'Try clearing active filters or search terms.',
               ),
             )
           else
@@ -227,12 +228,18 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: listContent);
+      return PremiumScreenBackground(
+        accentColor: primary,
+        child: SafeArea(bottom: false, child: listContent),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(title: const Text('Patient Directory')),
-      body: listContent,
+      appBar: AppBar(title: const Text('Patient Registry')),
+      body: PremiumScreenBackground(
+        accentColor: primary,
+        child: listContent,
+      ),
     );
   }
 
@@ -245,128 +252,143 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return FutureBuilder<PatientDirectoryRecord>(
-          future: controller.api.fetchPatientDetail(patient.id),
-          builder: (context, snapshot) {
-            final p = snapshot.data ?? patient;
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: FutureBuilder<PatientDirectoryRecord>(
+            future: controller.api.fetchPatientDetail(patient.id),
+            builder: (context, snapshot) {
+              final p = snapshot.data ?? patient;
 
-            return DraggableScrollableSheet(
-              initialChildSize: 0.72,
-              minChildSize: 0.5,
-              maxChildSize: 0.9,
-              expand: false,
-              builder: (_, scrollCtrl) {
-                return ListView(
-                  controller: scrollCtrl,
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 38,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: AppColors.border,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          alignment: Alignment.center,
+              return DraggableScrollableSheet(
+                initialChildSize: 0.74,
+                minChildSize: 0.5,
+                maxChildSize: 0.92,
+                expand: false,
+                builder: (_, scrollCtrl) {
+                  return ListView(
+                    controller: scrollCtrl,
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4.5,
                           decoration: BoxDecoration(
-                            color: primary.withAlpha(22),
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          child: Text(
-                            p.initials,
-                            style: TextStyle(
-                              color: primary,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            color: const Color(0xFFCBD5E1),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                p.patientName,
-                                style: const TextStyle(
-                                  fontSize: 17.5,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                '${p.patientUniqueId}  •  ${p.age > 0 ? "${p.age} Yrs" : "-"}  •  ${p.gender}',
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.close_rounded),
-                          onPressed: () => Navigator.of(ctx).pop(),
-                        ),
-                      ],
-                    ),
-                    if (snapshot.connectionState == ConnectionState.waiting)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 10),
-                        child: LinearProgressIndicator(),
                       ),
-                    const SizedBox(height: 16),
-                    const Divider(height: 1),
-                    const SizedBox(height: 14),
-                    _DetailFieldRow('UHID', p.patientUniqueId),
-                    _DetailFieldRow(
-                      'Phone Number',
-                      p.phone.isEmpty ? '-' : p.phone,
-                    ),
-                    _DetailFieldRow(
-                      'Blood Group',
-                      p.bloodGroup.isEmpty ? '-' : p.bloodGroup,
-                    ),
-                    _DetailFieldRow(
-                      'Guardian Name',
-                      p.guardianName.trim().isEmpty ? '-' : p.guardianName,
-                    ),
-                    _DetailFieldRow(
-                      'Address',
-                      p.address.trim().isEmpty ? '-' : p.address,
-                    ),
-                    _DetailFieldRow(
-                      'ABHA Number',
-                      p.hasAbha ? p.abhaNumber : 'Not Linked',
-                    ),
-                    if (p.abhaAddress.isNotEmpty)
-                      _DetailFieldRow('ABHA Address', p.abhaAddress),
-                    if (p.knownAllergies.isNotEmpty)
-                      _DetailFieldRow('Known Allergies', p.knownAllergies),
-                    _DetailFieldRow(
-                      'Due Balance',
-                      AppFormatters.formatCurrencyTwoDecimals(p.dueBalance),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [primary, primary.withAlpha(190)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Text(
+                                p.initials,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    p.patientName,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: -0.4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${p.patientUniqueId}  •  ${p.age > 0 ? "${p.age} Yrs" : "-"}  •  ${p.gender}',
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () => Navigator.of(ctx).pop(),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (snapshot.connectionState == ConnectionState.waiting)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 10),
+                          child: LinearProgressIndicator(),
+                        ),
+                      const SizedBox(height: 16),
+                      _DetailFieldRow('UHID', p.patientUniqueId),
+                      _DetailFieldRow(
+                        'Mobile Number',
+                        p.phone.isEmpty ? '—' : p.phone,
+                      ),
+                      _DetailFieldRow(
+                        'Blood Group',
+                        p.bloodGroup.isEmpty ? '—' : p.bloodGroup,
+                      ),
+                      _DetailFieldRow(
+                        'Guardian Name',
+                        p.guardianName.trim().isEmpty ? '—' : p.guardianName,
+                      ),
+                      _DetailFieldRow(
+                        'Residential Address',
+                        p.address.trim().isEmpty ? '—' : p.address,
+                      ),
+                      _DetailFieldRow(
+                        'ABHA Health ID',
+                        p.hasAbha ? p.abhaNumber : 'Not Linked',
+                      ),
+                      if (p.abhaAddress.isNotEmpty)
+                        _DetailFieldRow('ABHA Address', p.abhaAddress),
+                      if (p.knownAllergies.isNotEmpty)
+                        _DetailFieldRow('Known Allergies', p.knownAllergies),
+                      _DetailFieldRow(
+                        'Outstanding Balance',
+                        AppFormatters.formatCurrencyTwoDecimals(p.dueBalance),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
+          ),
         );
       },
     );
@@ -374,12 +396,14 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
 }
 
 class _FilterDropdownChip extends StatelessWidget {
+  final IconData icon;
   final String? prefix;
   final String value;
   final List<String> options;
   final ValueChanged<String> onChanged;
 
   const _FilterDropdownChip({
+    required this.icon,
     this.prefix,
     required this.value,
     required this.options,
@@ -388,36 +412,54 @@ class _FilterDropdownChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primary = NursePortalScope.of(context).personalTheme.primaryColor;
     return Container(
-      height: 36,
+      height: 38,
       padding: const EdgeInsets.symmetric(horizontal: 11),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(13),
         border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: value,
-          isDense: true,
-          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 17),
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x060F172A),
+            blurRadius: 10,
+            offset: Offset(0, 3),
           ),
-          items: options
-              .map(
-                (opt) => DropdownMenuItem<String>(
-                  value: opt,
-                  child: Text('${prefix ?? ""}$opt'),
-                ),
-              )
-              .toList(),
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: primary),
+          const SizedBox(width: 6),
+          DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isDense: true,
+              icon: const Padding(
+                padding: EdgeInsets.only(left: 3),
+                child: Icon(Icons.keyboard_arrow_down_rounded, size: 17),
+              ),
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+              items: options
+                  .map(
+                    (opt) => DropdownMenuItem<String>(
+                      value: opt,
+                      child: Text('${prefix ?? ""}$opt'),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) onChanged(v);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -441,35 +483,43 @@ class _PatientDirectoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: SoftSurfaceCard(
         onTap: onView,
-        padding: const EdgeInsets.all(14),
-        borderRadius: BorderRadius.circular(18),
+        padding: const EdgeInsets.all(15),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 45,
+                  height: 45,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(20),
-                    borderRadius: BorderRadius.circular(13),
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor.withAlpha(32),
+                        primaryColor.withAlpha(12),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: primaryColor.withAlpha(38)),
                   ),
                   child: Text(
                     patient.initials,
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-                const SizedBox(width: 11),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -477,11 +527,12 @@ class _PatientDirectoryCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            '#$index  ',
+                            '#$index ',
                             style: const TextStyle(
                               color: AppColors.textMuted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                              fontFeatures: AppTheme.tabularNums,
                             ),
                           ),
                           Expanded(
@@ -491,14 +542,15 @@ class _PatientDirectoryCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textPrimary,
-                                fontSize: 15,
+                                fontSize: 15.5,
                                 fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 5),
                       Wrap(
                         spacing: 6,
                         runSpacing: 4,
@@ -506,19 +558,39 @@ class _PatientDirectoryCard extends StatelessWidget {
                           if (patient.patientUniqueId.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 2,
+                                horizontal: 7.5,
+                                vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                borderRadius: BorderRadius.circular(6),
+                                color: primaryColor.withAlpha(16),
+                                borderRadius: BorderRadius.circular(7),
                               ),
                               child: Text(
                                 patient.patientUniqueId,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 11,
+                                style: TextStyle(
+                                  color: primaryColor,
+                                  fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
+                                  fontFeatures: AppTheme.tabularNums,
+                                ),
+                              ),
+                            ),
+                          if (patient.bloodGroup.trim().isNotEmpty)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 2.5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF1F2),
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                              child: Text(
+                                patient.bloodGroup,
+                                style: const TextStyle(
+                                  color: Color(0xFFBE123C),
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w900,
                                 ),
                               ),
                             ),
@@ -526,15 +598,15 @@ class _PatientDirectoryCard extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 7,
-                                vertical: 2,
+                                vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
                                 color: AppColors.successSoft,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(7),
                               ),
-                              child: Text(
-                                'ABHA • ${patient.abhaNumber}',
-                                style: const TextStyle(
+                              child: const Text(
+                                '✓ ABHA Linked',
+                                style: TextStyle(
                                   color: Color(0xFF059669),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
@@ -546,14 +618,17 @@ class _PatientDirectoryCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
                   decoration: BoxDecoration(
                     color: patient.dueBalance > 0
                         ? AppColors.dangerSoft
                         : AppColors.successSoft,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     AppFormatters.formatCurrencyTwoDecimals(patient.dueBalance),
@@ -563,17 +638,19 @@ class _PatientDirectoryCard extends StatelessWidget {
                           : const Color(0xFF059669),
                       fontSize: 11.5,
                       fontWeight: FontWeight.w800,
+                      fontFeatures: AppTheme.tabularNums,
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 11),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
               decoration: BoxDecoration(
                 color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(11),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
               ),
               child: Row(
                 children: [
@@ -588,11 +665,11 @@ class _PatientDirectoryCard extends StatelessWidget {
                   if (patient.phone.isNotEmpty) ...[
                     const SizedBox(width: 10),
                     const Icon(
-                      Icons.phone_outlined,
+                      Icons.phone_rounded,
                       size: 13,
                       color: AppColors.textMuted,
                     ),
-                    const SizedBox(width: 3),
+                    const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         patient.phone,
@@ -601,7 +678,8 @@ class _PatientDirectoryCard extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w700,
+                          fontFeatures: AppTheme.tabularNums,
                         ),
                       ),
                     ),
@@ -609,12 +687,12 @@ class _PatientDirectoryCard extends StatelessWidget {
                       const SizedBox(width: 5),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 5.5,
+                          horizontal: 6,
                           vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.warningSoft,
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           'Shared ($sharedPhoneCount)',
@@ -629,7 +707,7 @@ class _PatientDirectoryCard extends StatelessWidget {
                   ],
                   const Spacer(),
                   Text(
-                    'View ›',
+                    'Details ›',
                     style: TextStyle(
                       color: primaryColor,
                       fontSize: 12,
@@ -654,13 +732,19 @@ class _DetailFieldRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 11),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(color: AppColors.divider),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 130,
             child: Text(
               label,
               style: const TextStyle(
@@ -676,7 +760,7 @@ class _DetailFieldRow extends StatelessWidget {
               style: const TextStyle(
                 color: AppColors.textPrimary,
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

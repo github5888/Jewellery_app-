@@ -10,12 +10,11 @@ import '../medications/medications_mar_screen.dart';
 import '../patients/ipd_patient_detail_screen.dart';
 import '../vitals/record_vitals_screen.dart';
 
-/// Native Mobile IPD In-Patient Management Screen (`GET /api/ipd`):
-/// - Clean `MobileScreenHeader` + `Bed Status` shortcut
-/// - 4-Card Inpatient KPI Summary (`Active`, `Occupied Beds`, `Free Beds`, `Dues`)
-/// - Segmented toggle (`Active Inpatients` / `Discharged`) + `Antenatal: N` pill
-/// - Search (`Search by name, UHID, bed, doctor...`)
-/// - Floating white Inpatient Cards with `Chart`, `Vitals`, `Meds`.
+/// Executive Mobile IPD In-Patient Ward Screen (`GET /api/ipd`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `Bed Matrix` capsule
+/// - 4-Card Sculpted Inpatient Telemetry Strip (`Admitted`, `Occupied`, `Vacant`, `Ward Dues`)
+/// - Capsule Segmented Toggle (`Active Ward` / `Discharged`) + `Antenatal` ruby badge
+/// - `PremiumSearchField` + OneMedical-style Inpatient Pass Cards (`Open Chart`, `Vitals`, `Meds`).
 class IpdManagementScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -69,10 +68,10 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
           if (widget.isEmbeddedInShell)
             MobileScreenHeader(
               title: 'IPD Ward',
-              subtitle: 'Inpatient care, bedside chart, vitals & MAR',
+              subtitle: 'Inpatient care, bedside charts, vitals & MAR',
               countBadge: '${controller.activePatientsCount} Active',
               trailingAction: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -81,24 +80,31 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
                   );
                 },
                 child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 11),
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: AppColors.border),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x080F172A),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.bed_rounded, size: 16, color: primary),
+                      Icon(Icons.grid_view_rounded, size: 15, color: primary),
                       const SizedBox(width: 5),
                       const Text(
                         'Beds',
                         style: TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
@@ -107,7 +113,7 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
               ),
             ),
 
-          // 4-Metric IPD Summary Strip
+          // 4-Metric Sculpted IPD Summary Strip
           Row(
             children: [
               Expanded(
@@ -129,7 +135,7 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
               Expanded(
                 child: _IpdMetricBox(
                   value: '${controller.availableBedsCount}',
-                  label: 'Free Beds',
+                  label: 'Vacant',
                   accent: const Color(0xFF059669),
                 ),
               ),
@@ -139,73 +145,68 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
                   value: AppFormatters.formatCurrencyInr(
                     controller.ipdOutstandingDues,
                   ),
-                  label: 'Dues',
+                  label: 'Ward Dues',
                   accent: const Color(0xFFE11D48),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
           // Segmented Active / Discharged Toggle + Antenatal Pill
-          Row(
-            children: [
-              _SegmentPill(
-                label: 'Active (${controller.activePatientsCount})',
-                selected: !showDischarged,
-                primary: primary,
-                onTap: () => controller.setIpdShowDischarged(false),
-              ),
-              const SizedBox(width: 8),
-              _SegmentPill(
-                label: 'Discharged (${controller.dischargedPatientsCount})',
-                selected: showDischarged,
-                primary: primary,
-                onTap: () => controller.setIpdShowDischarged(true),
-              ),
-              const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF1F2),
-                  borderRadius: BorderRadius.circular(20),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _SegmentPill(
+                  label: 'Active Ward (${controller.activePatientsCount})',
+                  selected: !showDischarged,
+                  primary: primary,
+                  onTap: () => controller.setIpdShowDischarged(false),
                 ),
-                child: Text(
-                  '♥ Antenatal: ${controller.ipdAntenatalCount}',
-                  style: const TextStyle(
-                    color: Color(0xFFBE123C),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                const SizedBox(width: 8),
+                _SegmentPill(
+                  label: 'Discharged (${controller.dischargedPatientsCount})',
+                  selected: showDischarged,
+                  primary: primary,
+                  onTap: () => controller.setIpdShowDischarged(true),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 11,
+                    vertical: 7.5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF1F2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFECDD3)),
+                  ),
+                  child: Text(
+                    '♥ Antenatal: ${controller.ipdAntenatalCount}',
+                    style: const TextStyle(
+                      color: Color(0xFFBE123C),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-
-          // Search Box
-          TextField(
-            controller: _searchCtrl,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Search by name, UHID, bed, doctor...',
-              prefixIcon: Icon(Icons.search_rounded, size: 20, color: primary),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
+              ],
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+
+          // Elevated Pill Search Box
+          PremiumSearchField(
+            controller: _searchCtrl,
+            accentColor: primary,
+            hintText: 'Search patient, UHID, ward bed or doctor...',
+            onChanged: (_) => setState(() {}),
+          ),
+
+          const SizedBox(height: 16),
 
           if (filtered.isEmpty)
             SoftSurfaceCard(
@@ -215,7 +216,7 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
                     ? 'No Discharged IPD Records'
                     : 'No Active IPD Admissions',
                 subtitle: _searchCtrl.text.isNotEmpty
-                    ? 'No IPD records matched your search.'
+                    ? 'No IPD records matched your search query.'
                     : 'Inpatient records from /api/ipd appear here.',
               ),
             )
@@ -231,12 +232,18 @@ class _IpdManagementScreenState extends State<IpdManagementScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: content);
+      return PremiumScreenBackground(
+        accentColor: primary,
+        child: SafeArea(bottom: false, child: content),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('IPD - In Patient')),
-      body: content,
+      body: PremiumScreenBackground(
+        accentColor: primary,
+        child: content,
+      ),
     );
   }
 }
@@ -254,13 +261,9 @@ class _IpdMetricBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
+    return SoftSurfaceCard(
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      borderRadius: BorderRadius.circular(18),
       child: Column(
         children: [
           Text(
@@ -271,9 +274,10 @@ class _IpdMetricBox extends StatelessWidget {
               color: accent,
               fontSize: 18,
               fontWeight: FontWeight.w900,
+              fontFeatures: AppTheme.tabularNums,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             maxLines: 1,
@@ -281,7 +285,7 @@ class _IpdMetricBox extends StatelessWidget {
             style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 11,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
@@ -308,19 +312,29 @@ class _SegmentPill extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? primary : AppColors.border),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: primary.withAlpha(55),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: selected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -340,67 +354,108 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeStr = AppFormatters.formatTime24h(ipd.admissionDate);
+    final initials = AppFormatters.initials(ipd.patient.patientName);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 13),
       child: SoftSurfaceCard(
-        padding: const EdgeInsets.all(15),
-        borderRadius: BorderRadius.circular(18),
+        padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
+                    color: primaryColor.withAlpha(18),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     ipd.ipdNo,
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: AppTheme.tabularNums,
                     ),
                   ),
                 ),
                 if (ipd.caseReferenceId.isNotEmpty) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   Text(
-                    ipd.caseReferenceId,
+                    'Case #${ipd.caseReferenceId}',
                     style: const TextStyle(
                       color: AppColors.textMuted,
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4.5,
                   ),
-                  child: Text(
-                    ipd.wardAndBedLabel,
-                    style: const TextStyle(
-                      color: AppColors.textPrimary,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                    ),
+                  decoration: BoxDecoration(
+                    color: primaryColor.withAlpha(16),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: primaryColor.withAlpha(36)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.hotel_rounded,
+                        size: 13,
+                        color: primaryColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        ipd.wardAndBedLabel,
+                        style: TextStyle(
+                          color: primaryColor,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryColor.withAlpha(30),
+                        primaryColor.withAlpha(12),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,6 +466,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -431,36 +487,45 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      AppFormatters.formatSlashDate(ipd.admissionDate),
+              ],
+            ),
+            const SizedBox(height: 11),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.medical_information_rounded,
+                    size: 15,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      '${ipd.doctor.displayName}${ipd.department.isNotEmpty ? " • ${ipd.department}" : ""}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textPrimary,
-                        fontSize: 12,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    if (timeStr.isNotEmpty)
-                      Text(
-                        '$timeStr • ${ipd.admissionType}',
-                        style: const TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 9),
-            Text(
-              'Consultant: ${ipd.doctor.displayName}${ipd.department.isNotEmpty ? " (${ipd.department})" : ""}',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+                  ),
+                  Text(
+                    '${AppFormatters.formatSlashDate(ipd.admissionDate)}${timeStr.isNotEmpty ? " • $timeStr" : ""}',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 12),
@@ -471,10 +536,10 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: primaryColor,
-                      minimumSize: const Size(0, 38),
+                      minimumSize: const Size(0, 40),
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(11),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: () {
@@ -487,73 +552,102 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.assignment_ind_outlined, size: 15),
-                    label: const Text('Chart', style: TextStyle(fontSize: 12.5)),
+                    icon: const Icon(Icons.assignment_ind_rounded, size: 15),
+                    label: const Text(
+                      'Open Chart',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
-                if (!ipd.isDischarged) ...[
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 38),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(11),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _IpdQuickPillBtn(
+                    icon: Icons.favorite_rounded,
+                    label: 'Vitals',
+                    fg: const Color(0xFFE11D48),
+                    bg: const Color(0xFFFFF1F2),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RecordVitalsScreen(ipdAdmission: ipd),
                         ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                RecordVitalsScreen(ipdAdmission: ipd),
-                          ),
-                        );
-                      },
-                      icon: Icon(
-                        Icons.favorite_border_rounded,
-                        size: 15,
-                        color: primaryColor,
-                      ),
-                      label:
-                          const Text('Vitals', style: TextStyle(fontSize: 12.5)),
-                    ),
+                      );
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 3,
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 38),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(11),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: _IpdQuickPillBtn(
+                    icon: Icons.medication_rounded,
+                    label: 'Meds',
+                    fg: const Color(0xFF6D28D9),
+                    bg: const Color(0xFFF5F3FF),
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => MedicationsMarScreen(
+                            filterIpdId: ipd.id,
+                            patientTitle: ipd.patient.patientName,
+                          ),
                         ),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => MedicationsMarScreen(
-                              filterIpdId: ipd.id,
-                              patientTitle: ipd.patient.patientName,
-                            ),
-                          ),
-                        );
-                      },
-                      icon: Icon(
-                        Icons.medication_outlined,
-                        size: 15,
-                        color: primaryColor,
-                      ),
-                      label:
-                          const Text('Meds', style: TextStyle(fontSize: 12.5)),
-                    ),
+                      );
+                    },
                   ),
-                ],
+                ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IpdQuickPillBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color fg;
+  final Color bg;
+  final VoidCallback onTap;
+
+  const _IpdQuickPillBtn({
+    required this.icon,
+    required this.label,
+    required this.fg,
+    required this.bg,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: SizedBox(
+          height: 40,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 15, color: fg),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  color: fg,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

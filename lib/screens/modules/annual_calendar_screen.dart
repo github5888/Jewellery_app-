@@ -6,11 +6,11 @@ import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Native Mobile Annual Calendar Screen (`GET /api/holidays`):
-/// - Clean `MobileScreenHeader` (`Annual Calendar`, `N Holidays`, `India • 2026` badge)
-/// - Segmented Tabs (`Upcoming` default, `Today`, `Past`, `All Holidays`)
-/// - Type Filter + Search (`Search description, date...`)
-/// - Crisp floating white Holiday Cards (`Tue, 24 Nov, 2026`, `Guru Nanak's Birthday`, `Front Site: Yes`, `Default`).
+/// Executive Mobile Annual Calendar Screen (`GET /api/holidays`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader`
+/// - Smooth Capsule Tabs (`Upcoming`, `Today`, `Past`, `All`)
+/// - `PremiumSearchField` + Type Selector
+/// - Sculpted Two-Tone Calendar Leaf Holiday Cards (`NOV 24`, `Guru Nanak's Birthday`, `Front Site: Yes`).
 class AnnualCalendarScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -104,7 +104,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
               countBadge: '${allHolidays.length}',
             ),
 
-          // Tabs Row
+          // Capsule Tabs Row
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -115,21 +115,21 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'upcoming'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _CalendarTabPill(
                   label: 'Today (${todayList.length})',
                   selected: _selectedTab == 'today',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'today'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _CalendarTabPill(
                   label: 'Past (${pastList.length})',
                   selected: _selectedTab == 'past',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'past'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _CalendarTabPill(
                   label: 'All (${allHolidays.length})',
                   selected: _selectedTab == 'all',
@@ -142,16 +142,23 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
 
           const SizedBox(height: 12),
 
-          // Type Filter + Search Row
+          // Search + Type Filter
           Row(
             children: [
               Container(
-                height: 46,
-                padding: const EdgeInsets.symmetric(horizontal: 11),
+                height: 50,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: AppColors.border),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x080F172A),
+                      blurRadius: 14,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<String>(
@@ -164,7 +171,7 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
                     style: const TextStyle(
                       color: AppColors.textPrimary,
                       fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w800,
                     ),
                     items: typeOptions
                         .map(
@@ -182,29 +189,17 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: TextField(
+                child: PremiumSearchField(
                   controller: _searchCtrl,
+                  accentColor: primary,
+                  hintText: 'Search holiday or date...',
                   onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Search description, date...',
-                    prefixIcon:
-                        Icon(Icons.search_rounded, size: 19, color: primary),
-                    suffixIcon: _searchCtrl.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18),
-                            onPressed: () {
-                              _searchCtrl.clear();
-                              setState(() {});
-                            },
-                          )
-                        : null,
-                  ),
                 ),
               ),
             ],
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           if (filtered.isEmpty)
             const SoftSurfaceCard(
@@ -223,12 +218,18 @@ class _AnnualCalendarScreenState extends State<AnnualCalendarScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: content);
+      return PremiumScreenBackground(
+        accentColor: primary,
+        child: SafeArea(bottom: false, child: content),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Annual Calendar')),
-      body: content,
+      body: PremiumScreenBackground(
+        accentColor: primary,
+        child: content,
+      ),
     );
   }
 }
@@ -251,19 +252,29 @@ class _CalendarTabPill extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? primary : AppColors.border),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: primary.withAlpha(55),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: selected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -301,46 +312,61 @@ class _HolidayCard extends StatelessWidget {
     final monLabel = dt != null ? months[dt.month - 1] : '';
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: SoftSurfaceCard(
-        padding: const EdgeInsets.all(14),
-        borderRadius: BorderRadius.circular(18),
+        padding: const EdgeInsets.all(15),
+        borderRadius: BorderRadius.circular(22),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Clean Calendar Leaf Badge on Left
+            // Sculpted Two-Tone Calendar Leaf Badge
             Container(
-              width: 52,
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              width: 56,
               decoration: BoxDecoration(
-                color: primaryColor.withAlpha(18),
-                borderRadius: BorderRadius.circular(14),
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(15),
+                border: Border.all(color: AppColors.border),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    monLabel,
-                    style: TextStyle(
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
                       color: primaryColor,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                      borderRadius: const BorderRadius.vertical(
+                        top: Radius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      monLabel,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.7,
+                      ),
                     ),
                   ),
-                  Text(
-                    dayNum,
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                      height: 1.15,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 7),
+                    child: Text(
+                      dayNum,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        height: 1.0,
+                        fontFeatures: AppTheme.tabularNums,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 13),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,19 +380,21 @@ class _HolidayCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: AppColors.textPrimary,
-                            fontSize: 15,
+                            fontSize: 15.5,
                             fontWeight: FontWeight.w800,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2.5,
+                          horizontal: 8,
+                          vertical: 3,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.warningSoft,
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                         ),
                         child: Text(
                           item.type,
@@ -387,23 +415,23 @@ class _HolidayCard extends StatelessWidget {
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  const SizedBox(height: 6),
                   Wrap(
                     spacing: 6,
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 7,
-                          vertical: 2,
+                          horizontal: 8,
+                          vertical: 2.5,
                         ),
                         decoration: BoxDecoration(
                           color: item.frontSite
                               ? AppColors.successSoft
                               : const Color(0xFFF1F5F9),
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(7),
                         ),
                         child: Text(
                           'Front Site: ${item.frontSite ? "Yes" : "No"}',
@@ -419,12 +447,12 @@ class _HolidayCard extends StatelessWidget {
                       if (item.isDefault)
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 2,
+                            horizontal: 8,
+                            vertical: 2.5,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(7),
                           ),
                           child: const Text(
                             'Default',

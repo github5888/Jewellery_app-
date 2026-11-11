@@ -7,12 +7,11 @@ import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 import '../vitals/record_vitals_screen.dart';
 
-/// Native Mobile OPD Queue & Triage Screen (`GET /api/opd`):
-/// - Clean `MobileScreenHeader` + `ABHA Scan` button
-/// - Sleek 4-column OPD Queue Strip (`Waiting`, `In Consult`, `Scheduled`, `Completed`)
-/// - Segmented Filter Pills (`Waiting` default, `In Consultation`, `Scheduled`, `Completed`, `Cancelled`, `All`)
-/// - Search (`Search by Patient, OPD, Case ID..`)
-/// - Floating white OPD Consultation Cards with `Vitals` recording action.
+/// Executive Mobile OPD Queue & Triage Screen (`GET /api/opd`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `ABHA Scan` capsule
+/// - Sculpted 4-Column OPD Queue Telemetry Strip (`Waiting`, `Consult`, `Scheduled`, `Completed`)
+/// - `PremiumSearchField` + Smooth Capsule Filter Pills
+/// - Executive OPD Consultation Cards with Token/OPD pill, Vitals status badge, Consultant bar & `Record Vitals` CTA.
 class OpdTriageScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -94,18 +93,18 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
         children: [
           if (widget.isEmbeddedInShell)
             MobileScreenHeader(
-              title: 'OPD Queue',
-              subtitle: 'Outpatient consultations & triage vitals',
+              title: 'OPD Triage',
+              subtitle: 'Out-patient consultations & pre-doctor vitals',
               countBadge: '${visits.length}',
               trailingAction: InkWell(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 onTap: () => _showAbhaQueueSheet(context),
                 child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 11),
+                  height: 40,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   decoration: BoxDecoration(
                     color: AppColors.successSoft,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: const Color(0xFFA7F3D0)),
                   ),
                   child: Row(
@@ -133,7 +132,7 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
               ),
             ),
 
-          // 4-Column Compact OPD Queue Summary Strip
+          // 4-Column Sculpted OPD Queue Strip
           Row(
             children: [
               Expanded(
@@ -178,30 +177,19 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
             ],
           ),
 
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
 
-          // Search Box
-          TextField(
+          // Elevated Pill Search Field
+          PremiumSearchField(
             controller: _searchCtrl,
+            accentColor: primary,
+            hintText: 'Search patient, OPD no, case ID or doctor...',
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              hintText: 'Search by Patient, OPD, Case ID..',
-              prefixIcon: Icon(Icons.search_rounded, size: 20, color: primary),
-              suffixIcon: _searchCtrl.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _searchCtrl.clear();
-                        setState(() {});
-                      },
-                    )
-                  : null,
-            ),
           ),
 
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Queue Filter Pills
+          // Queue Filter Capsule Pills
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
@@ -212,35 +200,35 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'waiting'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _QueueTabChip(
-                  label: 'In Consultation (${inConsultList.length})',
+                  label: 'In Consult (${inConsultList.length})',
                   selected: _selectedTab == 'in_consultation',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'in_consultation'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _QueueTabChip(
                   label: 'Scheduled (${scheduledList.length})',
                   selected: _selectedTab == 'scheduled',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'scheduled'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _QueueTabChip(
                   label: 'Completed (${completedList.length})',
                   selected: _selectedTab == 'completed',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'completed'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _QueueTabChip(
                   label: 'Cancelled (${cancelledList.length})',
                   selected: _selectedTab == 'cancelled',
                   primary: primary,
                   onTap: () => setState(() => _selectedTab = 'cancelled'),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 _QueueTabChip(
                   label: 'All (${visits.length})',
                   selected: _selectedTab == 'all',
@@ -251,14 +239,14 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
             ),
           ),
 
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
           if (filtered.isEmpty)
             const SoftSurfaceCard(
               child: ClinicalEmptyState(
                 icon: Icons.medical_information_outlined,
-                title: 'No Consultations in Queue',
-                subtitle: 'Switch queue tabs above or pull down to refresh.',
+                title: 'No Consultations in Selected Queue',
+                subtitle: 'Switch queue status tabs above or pull down to sync.',
               ),
             )
           else
@@ -270,12 +258,18 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: content);
+      return PremiumScreenBackground(
+        accentColor: primary,
+        child: SafeArea(bottom: false, child: content),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('OPD - Out Patient')),
-      body: content,
+      body: PremiumScreenBackground(
+        accentColor: primary,
+        child: content,
+      ),
     );
   }
 
@@ -285,59 +279,76 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
         return Container(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.72,
+            maxHeight: MediaQuery.of(ctx).size.height * 0.78,
           ),
-          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Center(
                 child: Container(
-                  width: 38,
-                  height: 4,
+                  width: 40,
+                  height: 4.5,
                   decoration: BoxDecoration(
-                    color: AppColors.border,
+                    color: const Color(0xFFCBD5E1),
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 16),
               Row(
                 children: [
-                  const Icon(
-                    Icons.qr_code_scanner_rounded,
-                    color: Color(0xFF059669),
+                  const GradientIconBadge(
+                    icon: Icons.qr_code_scanner_rounded,
+                    colors: [Color(0xFF10B981), Color(0xFF047857)],
+                    size: 38,
+                    iconSize: 19,
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'ABHA Scan & Share (${tokens.length})',
-                    style: const TextStyle(
-                      fontSize: 16.5,
-                      fontWeight: FontWeight.w800,
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ABHA Scan & Share Queue',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        Text(
+                          'Live ABDM fast-track OPD desk tokens',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close_rounded),
                     onPressed: () => Navigator.of(ctx).pop(),
                   ),
                 ],
               ),
-              const Divider(height: 12),
+              const SizedBox(height: 14),
               Expanded(
                 child: tokens.isEmpty
                     ? const ClinicalEmptyState(
                         icon: Icons.qr_code_2_rounded,
-                        title: 'No ABHA Scan Tokens',
+                        title: 'No Pending ABHA Scan Tokens',
                         subtitle:
-                            'Patients scanning the hospital ABDM QR appear here.',
+                            'Patients scanning the hospital ABDM QR code appear here.',
                       )
                     : ListView.separated(
                         itemCount: tokens.length,
@@ -345,23 +356,25 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
                         itemBuilder: (context, index) {
                           final t = tokens[index];
                           return SoftSurfaceCard(
-                            padding: const EdgeInsets.all(12),
+                            padding: const EdgeInsets.all(13),
+                            borderRadius: BorderRadius.circular(18),
                             child: Row(
                               children: [
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
+                                    horizontal: 11,
                                     vertical: 8,
                                   ),
                                   decoration: BoxDecoration(
                                     color: AppColors.successSoft,
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(11),
                                   ),
                                   child: Text(
                                     '#${t.tokenNumber}',
                                     style: const TextStyle(
                                       color: Color(0xFF059669),
                                       fontWeight: FontWeight.w900,
+                                      fontFeatures: AppTheme.tabularNums,
                                     ),
                                   ),
                                 ),
@@ -375,9 +388,10 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
                                         t.patientName,
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w800,
-                                          fontSize: 14,
+                                          fontSize: 14.5,
                                         ),
                                       ),
+                                      const SizedBox(height: 2),
                                       Text(
                                         [
                                           if (t.abhaNumber.isNotEmpty)
@@ -424,42 +438,35 @@ class _MiniQueueMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(16),
+    return SoftSurfaceCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: selected ? accent : AppColors.border,
-            width: selected ? 1.6 : 1,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+      borderRadius: BorderRadius.circular(18),
+      borderColor: selected ? accent : AppColors.border,
+      color: selected ? accent.withAlpha(14) : Colors.white,
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: selected ? accent : AppColors.textPrimary,
+              fontSize: 21,
+              fontWeight: FontWeight.w900,
+              fontFeatures: AppTheme.tabularNums,
+            ),
           ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                color: selected ? accent : AppColors.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w900,
-              ),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: selected ? accent : AppColors.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -483,19 +490,29 @@ class _QueueTabChip extends StatelessWidget {
     return InkWell(
       borderRadius: BorderRadius.circular(20),
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7.5),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
           color: selected ? primary : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: selected ? primary : AppColors.border),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: primary.withAlpha(55),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
             color: selected ? Colors.white : AppColors.textSecondary,
             fontSize: 12,
-            fontWeight: FontWeight.w700,
+            fontWeight: FontWeight.w800,
           ),
         ),
       ),
@@ -515,57 +532,63 @@ class _OpdVisitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final time24 = AppFormatters.formatTime24h(visit.appointmentDate);
+    final initials = AppFormatters.initials(visit.patient.patientName);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 12),
       child: SoftSurfaceCard(
-        padding: const EdgeInsets.all(15),
-        borderRadius: BorderRadius.circular(18),
+        padding: const EdgeInsets.all(16),
+        borderRadius: BorderRadius.circular(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(20),
-                    borderRadius: BorderRadius.circular(8),
+                    color: primaryColor.withAlpha(18),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     visit.opdNo,
                     style: TextStyle(
                       color: primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: AppTheme.tabularNums,
                     ),
                   ),
                 ),
                 if (visit.caseReferenceId.isNotEmpty) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 7),
                   Text(
-                    visit.caseReferenceId,
+                    'Case #${visit.caseReferenceId}',
                     style: const TextStyle(
                       color: AppColors.textMuted,
                       fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
                 const Spacer(),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: visit.hasVitalsRecorded
                         ? AppColors.successSoft
                         : AppColors.warningSoft,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
                     visit.hasVitalsRecorded
-                        ? '✓ Vitals Done'
+                        ? '✓ Vitals Recorded'
                         : '• Vitals Pending',
                     style: TextStyle(
                       color: visit.hasVitalsRecorded
@@ -578,9 +601,27 @@ class _OpdVisitCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Row(
               children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: primaryColor.withAlpha(18),
+                    borderRadius: BorderRadius.circular(13),
+                  ),
+                  child: Text(
+                    initials,
+                    style: TextStyle(
+                      color: primaryColor,
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 11),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -591,6 +632,7 @@ class _OpdVisitCard extends StatelessWidget {
                           color: AppColors.textPrimary,
                           fontSize: 15.5,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
                       const SizedBox(height: 3),
@@ -627,64 +669,84 @@ class _OpdVisitCard extends StatelessWidget {
                         style: const TextStyle(
                           color: AppColors.textMuted,
                           fontSize: 11,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        visit.doctorName,
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      if (visit.symptoms.trim().isNotEmpty)
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: AppColors.divider),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.medical_services_outlined,
+                    size: 15,
+                    color: primaryColor,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          visit.symptoms,
+                          visit.doctorName,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 11.5,
+                            color: AppColors.textPrimary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 13),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                        if (visit.symptoms.trim().isNotEmpty)
+                          Text(
+                            visit.symptoms,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => RecordVitalsScreen(opdVisit: visit),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: primaryColor,
+                      minimumSize: const Size(0, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(11),
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.monitor_heart_outlined, size: 15),
-                  label: const Text(
-                    'Vitals',
-                    style: TextStyle(fontSize: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => RecordVitalsScreen(opdVisit: visit),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.monitor_heart_rounded, size: 15),
+                    label: const Text(
+                      'Vitals',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         ),

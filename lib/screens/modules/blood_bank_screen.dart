@@ -5,10 +5,10 @@ import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Native Mobile Blood Bank Status Screen (`GET /api/blood-bank`):
-/// - Clean `MobileScreenHeader` + `[Donors]` action button
-/// - Summary banner with total available blood bags across all groups
-/// - Crisp 2x4 Blood Group Grid (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`)
+/// Executive Mobile Blood Bank Status Screen (`GET /api/blood-bank`):
+/// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader`
+/// - Crimson Executive Reserve Banner (`Total Available Units`, `8 Blood Groups`, `Donor Registry`)
+/// - 2x4 Sculpted Blood Group Stock Grid (`A+`, `A-`, `B+`, `B-`, `AB+`, `AB-`, `O+`, `O-`) with stock level bars.
 class BloodBankScreen extends StatefulWidget {
   final bool isEmbeddedInShell;
 
@@ -94,14 +94,17 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
-    final primary = controller.personalTheme.primaryColor;
     final groups = _orderedGroups(
       _localOverride ?? controller.bloodBankGroups,
     );
-    final totalBags = groups.fold<int>(0, (sum, item) => sum + item.availableBags);
+    final totalBags = groups.fold<int>(
+      0,
+      (sum, item) => sum + item.availableBags,
+    );
+    final lowGroups = groups.where((g) => g.availableBags <= 3).length;
 
     final content = RefreshIndicator(
-      color: primary,
+      color: const Color(0xFFBE123C),
       onRefresh: _refresh,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
@@ -110,52 +113,123 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
           if (widget.isEmbeddedInShell)
             MobileScreenHeader(
               title: 'Blood Bank',
-              subtitle: 'Live blood group stock & donor registry',
-              countBadge: '$totalBags Bags',
-              trailingAction: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => _showDonorDetailsModal(context),
-                child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+              subtitle: 'Live blood reserve inventory & donor registry',
+              countBadge: '$totalBags Units',
+            ),
+
+          // Crimson Executive Reserve Banner
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [
+                  Color(0xFF4C0519),
+                  Color(0xFF9F1239),
+                  Color(0xFFE11D48),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x36881337),
+                  blurRadius: 24,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.groups_rounded, size: 16, color: Colors.white),
-                      SizedBox(width: 6),
-                      Text(
-                        'Donors',
+                      const Text(
+                        'TOTAL BLOOD RESERVE',
                         style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
+                          color: Color(0xFFFECDD3),
+                          fontSize: 10,
                           fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.baseline,
+                        textBaseline: TextBaseline.alphabetic,
+                        children: [
+                          Text(
+                            '$totalBags',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.w900,
+                              height: 1.0,
+                              fontFeatures: AppTheme.tabularNums,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Bags Available',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        '${groups.length} Blood Groups  •  $lowGroups Low Reserve',
+                        style: const TextStyle(
+                          color: Color(0xFFFFE4E6),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
-            )
-          else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 14),
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primary,
-                    minimumSize: const Size(140, 40),
+                InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () => _showDonorDetailsModal(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.groups_rounded,
+                          size: 17,
+                          color: Color(0xFFBE123C),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Donors',
+                          style: TextStyle(
+                            color: Color(0xFFBE123C),
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  onPressed: () => _showDonorDetailsModal(context),
-                  icon: const Icon(Icons.groups_rounded, size: 17),
-                  label: const Text('Donor Details'),
                 ),
-              ),
+              ],
             ),
+          ),
+
+          const SizedBox(height: 16),
 
           if (_refreshing)
             const Padding(
@@ -175,7 +249,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
               child: ClinicalEmptyState(
                 icon: Icons.water_drop_outlined,
                 title: 'No Blood Bank Stock Returned',
-                subtitle: 'Pull down to refresh blood group inventory.',
+                subtitle: 'Pull down to sync blood group inventory.',
               ),
             )
           else
@@ -187,7 +261,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 1.32,
+                childAspectRatio: 1.22,
               ),
               itemBuilder: (context, index) {
                 return _BloodGroupStockCard(item: groups[index]);
@@ -198,12 +272,18 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     );
 
     if (widget.isEmbeddedInShell) {
-      return SafeArea(bottom: false, child: content);
+      return PremiumScreenBackground(
+        accentColor: const Color(0xFFBE123C),
+        child: SafeArea(bottom: false, child: content),
+      );
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Blood Bank Status')),
-      body: content,
+      body: PremiumScreenBackground(
+        accentColor: const Color(0xFFBE123C),
+        child: content,
+      ),
     );
   }
 
@@ -212,10 +292,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) => _DonorDetailsSheet(controller: controller),
     );
   }
@@ -229,10 +306,11 @@ class _BloodGroupStockCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lowStock = item.availableBags <= 3;
+    final fillRatio = (item.availableBags / 20.0).clamp(0.08, 1.0);
 
     return SoftSurfaceCard(
       padding: const EdgeInsets.all(15),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -240,50 +318,75 @@ class _BloodGroupStockCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                item.bloodGroup,
-                style: const TextStyle(
-                  color: Color(0xFFBE123C),
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.5,
-                ),
-              ),
               Container(
-                width: 36,
-                height: 36,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 11,
+                  vertical: 6,
+                ),
                 decoration: BoxDecoration(
                   color: const Color(0xFFFFF1F2),
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECDD3)),
                 ),
-                child: const Icon(
-                  Icons.water_drop_rounded,
-                  color: Color(0xFFE11D48),
-                  size: 19,
+                child: Text(
+                  item.bloodGroup,
+                  style: const TextStyle(
+                    color: Color(0xFFBE123C),
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.5,
+                  ),
                 ),
+              ),
+              const GradientIconBadge(
+                icon: Icons.water_drop_rounded,
+                colors: [Color(0xFFF43F5E), Color(0xFFBE123C)],
+                size: 34,
+                iconSize: 17,
+                radius: 11,
               ),
             ],
           ),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                lowStock ? 'Low Stock' : 'Available Bags',
-                style: TextStyle(
-                  color: lowStock
-                      ? const Color(0xFFD97706)
-                      : AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    lowStock ? 'Low Reserve' : 'In Stock',
+                    style: TextStyle(
+                      color: lowStock
+                          ? const Color(0xFFD97706)
+                          : const Color(0xFF059669),
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    '${item.availableBags} Bags',
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      fontFeatures: AppTheme.tabularNums,
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                '${item.availableBags}',
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: LinearProgressIndicator(
+                  value: fillRatio,
+                  minHeight: 5.5,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    lowStock
+                        ? const Color(0xFFF59E0B)
+                        : const Color(0xFFE11D48),
+                  ),
                 ),
               ),
             ],
@@ -323,31 +426,56 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
   Widget build(BuildContext context) {
     return Container(
       constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.80,
+        maxHeight: MediaQuery.of(context).size.height * 0.82,
       ),
-      padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Center(
             child: Container(
-              width: 38,
-              height: 4,
+              width: 40,
+              height: 4.5,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: const Color(0xFFCBD5E1),
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Row(
             children: [
-              const Icon(Icons.water_drop_rounded, color: Color(0xFFE11D48)),
-              const SizedBox(width: 8),
+              const GradientIconBadge(
+                icon: Icons.water_drop_rounded,
+                colors: [Color(0xFFF43F5E), Color(0xFFBE123C)],
+                size: 38,
+                iconSize: 19,
+              ),
+              const SizedBox(width: 12),
               const Expanded(
-                child: Text(
-                  'Blood Donor Directory',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Blood Donor Registry',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                    Text(
+                      'Registered hospital blood bank donors',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ),
               IconButton(
@@ -356,23 +484,21 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _searchCtrl,
-            onChanged: (_) => setState(() {}),
-            decoration: const InputDecoration(
-              hintText: 'Search donor name, blood group, contact...',
-              prefixIcon: Icon(Icons.search_rounded, size: 19),
-            ),
-          ),
           const SizedBox(height: 12),
+          PremiumSearchField(
+            controller: _searchCtrl,
+            accentColor: const Color(0xFFBE123C),
+            hintText: 'Search donor name, blood group, contact...',
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
           Expanded(
             child: FutureBuilder<List<BloodDonorRecord>>(
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const ClinicalLoadingState(
-                    message: 'Loading donor details...',
+                    message: 'Loading donor registry...',
                   );
                 }
                 final donors = snapshot.data ?? const [];
@@ -398,16 +524,20 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                   itemBuilder: (context, index) {
                     final d = filtered[index];
                     return SoftSurfaceCard(
-                      padding: const EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(13),
+                      borderRadius: BorderRadius.circular(18),
                       child: Row(
                         children: [
                           Container(
-                            width: 42,
-                            height: 42,
+                            width: 44,
+                            height: 44,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: const Color(0xFFFFF1F2),
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(13),
+                              border: Border.all(
+                                color: const Color(0xFFFECDD3),
+                              ),
                             ),
                             child: Text(
                               d.bloodGroup.isEmpty ? '-' : d.bloodGroup,
@@ -427,9 +557,10 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                                   d.donorName,
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
-                                    fontSize: 14,
+                                    fontSize: 14.5,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
                                   [
                                     if (d.age > 0) '${d.age} Yrs',
