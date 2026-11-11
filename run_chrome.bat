@@ -1,0 +1,3 @@
+@echo off
+echo Starting Smart Super Speciality Hospital Nurse Portal (Chrome + Live API Bridge)...
+dart run tool/run_web.dart %*

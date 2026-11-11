@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
@@ -28,15 +29,18 @@ class ApiClient {
 
   void updateBaseUrl(String newUrl) {
     _baseUrl = AppConfig.normalizeBaseUrl(newUrl);
+    AppConfig.webProxyActive = false;
   }
 
   void updateToken(String? token) {
-    _authToken = (token != null && token.trim().isNotEmpty) ? token.trim() : null;
+    _authToken =
+        (token != null && token.trim().isNotEmpty) ? token.trim() : null;
   }
 
   Map<String, String> _headers({
     bool includeAuth = true,
     bool jsonContent = true,
+    bool viaWebBridge = false,
   }) {
     final map = <String, String>{
       'Accept': 'application/json',
@@ -47,12 +51,21 @@ class ApiClient {
     if (includeAuth && hasToken) {
       map['Authorization'] = 'Bearer $_authToken';
     }
+    if (viaWebBridge && !AppConfig.isLoopbackUrl(_baseUrl)) {
+      map['X-Hospital-Target'] = _baseUrl;
+    }
     return map;
   }
 
-  Uri _buildUri(String path, [Map<String, String>? queryParameters]) {
+  Uri _buildUri(
+    String path, {
+    Map<String, String>? queryParameters,
+    String? overrideBaseUrl,
+  }) {
+    final effectiveBase =
+        overrideBaseUrl ?? AppConfig.effectiveTransportBaseUrl(_baseUrl);
     final cleanPath = path.startsWith('/') ? path : '/$path';
-    final uri = Uri.parse('$_baseUrl$cleanPath');
+    final uri = Uri.parse('$effectiveBase$cleanPath');
     if (queryParameters == null || queryParameters.isEmpty) {
       return uri;
     }
@@ -65,16 +78,43 @@ class ApiClient {
     return filtered.isEmpty ? uri : uri.replace(queryParameters: filtered);
   }
 
+  bool get _canFallbackToWebBridge =>
+      kIsWeb && !AppConfig.webProxyActive && !AppConfig.isLoopbackUrl(_baseUrl);
+
+  ApiException _formatNetworkError(Object e) {
+    final raw = e.toString();
+    if (kIsWeb &&
+        (raw.contains('Failed to fetch') || raw.contains('XMLHttpRequest'))) {
+      return ApiException(
+        message:
+            'Chrome browser CORS blocked direct request to $_baseUrl.\n'
+            'To run in Chrome, start with: dart run tool/run_web.dart (or double-click run_chrome.bat).\n'
+            'On Android APK / Emulator, direct connection works automatically.',
+      );
+    }
+    return ApiException(
+      message: 'Unable to connect to hospital server ($_baseUrl). $raw',
+    );
+  }
+
   Future<dynamic> get(
     String path, {
     Map<String, String>? queryParameters,
     bool includeAuth = true,
     Duration timeout = const Duration(seconds: 20),
   }) async {
-    final uri = _buildUri(path, queryParameters);
     try {
+      final usingBridge = kIsWeb && AppConfig.webProxyActive;
+      final uri = _buildUri(path, queryParameters: queryParameters);
       final response = await _http
-          .get(uri, headers: _headers(includeAuth: includeAuth, jsonContent: false))
+          .get(
+            uri,
+            headers: _headers(
+              includeAuth: includeAuth,
+              jsonContent: false,
+              viaWebBridge: usingBridge,
+            ),
+          )
           .timeout(timeout);
       return _decodeResponse(response, triggerAuthCallback: includeAuth);
     } on TimeoutException {
@@ -84,9 +124,31 @@ class ApiClient {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-        message: 'Unable to reach hospital server ($_baseUrl). $e',
-      );
+      if (_canFallbackToWebBridge) {
+        try {
+          final bridgeUri = _buildUri(
+            path,
+            queryParameters: queryParameters,
+            overrideBaseUrl: AppConfig.localWebCorsProxyUrl,
+          );
+          final bridgeRes = await _http
+              .get(
+                bridgeUri,
+                headers: _headers(
+                  includeAuth: includeAuth,
+                  jsonContent: false,
+                  viaWebBridge: true,
+                ),
+              )
+              .timeout(timeout);
+          AppConfig.webProxyActive = true;
+          return _decodeResponse(bridgeRes, triggerAuthCallback: includeAuth);
+        } on ApiException {
+          AppConfig.webProxyActive = true;
+          rethrow;
+        } catch (_) {}
+      }
+      throw _formatNetworkError(e);
     }
   }
 
@@ -96,13 +158,19 @@ class ApiClient {
     bool includeAuth = true,
     Duration timeout = const Duration(seconds: 20),
   }) async {
-    final uri = _buildUri(path);
+    final encodedBody = jsonEncode(body ?? const <String, dynamic>{});
     try {
+      final usingBridge = kIsWeb && AppConfig.webProxyActive;
+      final uri = _buildUri(path);
       final response = await _http
           .post(
             uri,
-            headers: _headers(includeAuth: includeAuth, jsonContent: true),
-            body: jsonEncode(body ?? const <String, dynamic>{}),
+            headers: _headers(
+              includeAuth: includeAuth,
+              jsonContent: true,
+              viaWebBridge: usingBridge,
+            ),
+            body: encodedBody,
           )
           .timeout(timeout);
       return _decodeResponse(response, triggerAuthCallback: includeAuth);
@@ -113,9 +181,31 @@ class ApiClient {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-        message: 'Unable to connect to hospital server ($_baseUrl). $e',
-      );
+      if (_canFallbackToWebBridge) {
+        try {
+          final bridgeUri = _buildUri(
+            path,
+            overrideBaseUrl: AppConfig.localWebCorsProxyUrl,
+          );
+          final bridgeRes = await _http
+              .post(
+                bridgeUri,
+                headers: _headers(
+                  includeAuth: includeAuth,
+                  jsonContent: true,
+                  viaWebBridge: true,
+                ),
+                body: encodedBody,
+              )
+              .timeout(timeout);
+          AppConfig.webProxyActive = true;
+          return _decodeResponse(bridgeRes, triggerAuthCallback: includeAuth);
+        } on ApiException {
+          AppConfig.webProxyActive = true;
+          rethrow;
+        } catch (_) {}
+      }
+      throw _formatNetworkError(e);
     }
   }
 
@@ -125,13 +215,19 @@ class ApiClient {
     bool includeAuth = true,
     Duration timeout = const Duration(seconds: 20),
   }) async {
-    final uri = _buildUri(path);
+    final encodedBody = jsonEncode(body ?? const <String, dynamic>{});
     try {
+      final usingBridge = kIsWeb && AppConfig.webProxyActive;
+      final uri = _buildUri(path);
       final response = await _http
           .put(
             uri,
-            headers: _headers(includeAuth: includeAuth, jsonContent: true),
-            body: jsonEncode(body ?? const <String, dynamic>{}),
+            headers: _headers(
+              includeAuth: includeAuth,
+              jsonContent: true,
+              viaWebBridge: usingBridge,
+            ),
+            body: encodedBody,
           )
           .timeout(timeout);
       return _decodeResponse(response, triggerAuthCallback: includeAuth);
@@ -142,9 +238,31 @@ class ApiClient {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-        message: 'Unable to connect to hospital server ($_baseUrl). $e',
-      );
+      if (_canFallbackToWebBridge) {
+        try {
+          final bridgeUri = _buildUri(
+            path,
+            overrideBaseUrl: AppConfig.localWebCorsProxyUrl,
+          );
+          final bridgeRes = await _http
+              .put(
+                bridgeUri,
+                headers: _headers(
+                  includeAuth: includeAuth,
+                  jsonContent: true,
+                  viaWebBridge: true,
+                ),
+                body: encodedBody,
+              )
+              .timeout(timeout);
+          AppConfig.webProxyActive = true;
+          return _decodeResponse(bridgeRes, triggerAuthCallback: includeAuth);
+        } on ApiException {
+          AppConfig.webProxyActive = true;
+          rethrow;
+        } catch (_) {}
+      }
+      throw _formatNetworkError(e);
     }
   }
 
@@ -154,7 +272,8 @@ class ApiClient {
     String rawReportPath, {
     Duration timeout = const Duration(seconds: 30),
   }) async {
-    final fullUrl = AppConfig.resolveAuthenticatedReportUrl(_baseUrl, rawReportPath);
+    final fullUrl =
+        AppConfig.resolveAuthenticatedReportUrl(_baseUrl, rawReportPath);
     final uri = Uri.parse(fullUrl);
     try {
       final response = await _http
@@ -162,18 +281,24 @@ class ApiClient {
             uri,
             headers: <String, String>{
               if (hasToken) 'Authorization': 'Bearer $_authToken',
+              if (kIsWeb &&
+                  AppConfig.webProxyActive &&
+                  !AppConfig.isLoopbackUrl(_baseUrl))
+                'X-Hospital-Target': _baseUrl,
             },
           )
           .timeout(timeout);
       if (response.statusCode == 401) {
         onUnauthorized?.call();
         throw const ApiException(
-          message: 'Session expired. Please log in again to view clinical reports.',
+          message:
+              'Session expired. Please log in again to view clinical reports.',
           statusCode: 401,
         );
       }
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        String errMsg = 'Failed to fetch clinical report (${response.statusCode})';
+        String errMsg =
+            'Failed to fetch clinical report (${response.statusCode})';
         try {
           final parsed = jsonDecode(response.body);
           if (parsed is Map && parsed['message'] != null) {
@@ -182,14 +307,15 @@ class ApiClient {
         } catch (_) {}
         throw ApiException(message: errMsg, statusCode: response.statusCode);
       }
-      final contentType = response.headers['content-type'] ?? 'application/octet-stream';
+      final contentType =
+          response.headers['content-type'] ?? 'application/octet-stream';
       return (bytes: response.bodyBytes, contentType: contentType);
     } on TimeoutException {
       throw const ApiException(message: 'Report download timed out.');
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(message: 'Could not download report: $e');
+      throw _formatNetworkError(e);
     }
   }
 
@@ -211,7 +337,8 @@ class ApiClient {
         onUnauthorized?.call();
       }
       throw ApiException(
-        message: _extractErrorMessage(decoded) ?? 'Invalid credentials or session expired.',
+        message: _extractErrorMessage(decoded) ??
+            'Invalid credentials or session expired.',
         statusCode: 401,
         rawBody: decoded,
       );
@@ -230,7 +357,8 @@ class ApiClient {
       final st = decoded['status'];
       if (st == 0 || st == false || st == '0' || st == 'error') {
         throw ApiException(
-          message: _extractErrorMessage(decoded) ?? 'Operation rejected by server.',
+          message: _extractErrorMessage(decoded) ??
+              'Operation rejected by server.',
           statusCode: response.statusCode,
           rawBody: decoded,
         );

@@ -40,7 +40,7 @@ class SocketService {
     String? hospitalId,
   }) {
     disconnect();
-    final normalizedUrl = AppConfig.normalizeBaseUrl(baseUrl);
+    final normalizedUrl = AppConfig.effectiveTransportBaseUrl(baseUrl);
     if (token.trim().isEmpty) return;
 
     final options = <String, dynamic>{

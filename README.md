@@ -44,7 +44,15 @@ flutter pub get
 flutter run
 ```
 
-*(If your local Flutter SDK uses a different native wrapper version, you can run `flutter create . --project-name smart_hospital_nurse` once before `flutter run` — it preserves `lib/` and `pubspec.yaml`.)*
+### Run in Chrome on Windows / Desktop (with Automatic Live CORS Bridge)
+
+Production `server.ts` on `https://hospital.hrpocket.in` blocks cross-origin browser `Origin: http://localhost:*` requests via CORS. Use the included single-command launcher (which starts a local Dart CORS bridge on `127.0.0.1:8787` and opens Chrome in a crisp mobile viewport):
+
+```bash
+dart run tool/run_web.dart
+```
+
+*(On Windows, you can also double-click `run_chrome.bat`.)*
 
 ### Build Release APK
 
