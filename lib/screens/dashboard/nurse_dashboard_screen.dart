@@ -1220,47 +1220,50 @@ class _ShiftPriorityTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return SoftSurfaceCard(
       onTap: onTap,
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 14),
       borderRadius: BorderRadius.circular(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GradientIconBadge(
-                icon: icon,
-                colors: gradientColors,
-                size: 35,
-                iconSize: 17,
-                radius: 11,
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: -0.6,
-                  fontFeatures: AppTheme.tabularNums,
-                ),
-              ),
-            ],
+          GradientIconBadge(
+            icon: icon,
+            colors: gradientColors,
+            size: 36,
+            iconSize: 18,
+            radius: 12,
           ),
           const SizedBox(height: 10),
+          Center(
+            child: Text(
+              value,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 25,
+                fontWeight: FontWeight.w900,
+                height: 1.05,
+                letterSpacing: -0.6,
+                fontFeatures: AppTheme.tabularNums,
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               color: AppColors.textPrimary,
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: FontWeight.w800,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             cue,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: gradientColors.last,
               fontSize: 10.5,

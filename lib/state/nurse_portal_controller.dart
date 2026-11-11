@@ -114,6 +114,7 @@ class NursePortalController extends ChangeNotifier {
   // Getters
   AuthStage get authStage => _authStage;
   String get baseUrl => _baseUrl;
+  String? get authToken => _apiClient.authToken;
   bool get serverReachable => _serverReachable;
   NurseUser? get currentUser => _currentUser;
   HospitalInfo get hospitalInfo =>
@@ -781,6 +782,10 @@ class NursePortalController extends ChangeNotifier {
         .fetchAbhaQueue()
         .then((v) => v, onError: (_) => _abhaQueue);
 
+    final meFuture = api
+        .fetchMe()
+        .then<NurseUser?>((v) => v, onError: (_) => _currentUser);
+
     final results = await Future.wait<dynamic>([
       dashFuture,
       allIpdFuture,
@@ -793,6 +798,7 @@ class NursePortalController extends ChangeNotifier {
       holidaysFuture,
       notificationsFuture,
       abhaFuture,
+      meFuture,
     ]);
 
     _dashboard = results[0] as NurseDashboardData?;
@@ -806,6 +812,17 @@ class NursePortalController extends ChangeNotifier {
     _holidays = results[8] as List<HospitalHolidayItem>;
     _serverNotifications = results[9] as List<ServerNotificationItem>;
     _abhaQueue = results[10] as List<AbhaScanCheckinItem>;
+    final refreshedUser = results[11] as NurseUser?;
+    if (refreshedUser != null) {
+      _currentUser = refreshedUser;
+      if (refreshedUser.hospitalInfo != null) {
+        _hospitalInfo = refreshedUser.hospitalInfo!;
+      }
+      _prefs?.setString(
+        AppConfig.storageKeyCachedUser,
+        jsonEncode(refreshedUser.toJson()),
+      );
+    }
 
     final basicAdmitted = allIpdList.where((p) => !p.isDischarged).toList();
     _dischargedPatients = allIpdList.where((p) => p.isDischarged).toList();

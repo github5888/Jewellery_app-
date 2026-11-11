@@ -88,26 +88,100 @@ class NurseApiService {
     return (token: token, user: user);
   }
 
+  Map<String, dynamic> _mergeNonEmptyMap(
+    Map<String, dynamic> primaryMap,
+    Map<String, dynamic> secondaryMap,
+  ) {
+    final result = <String, dynamic>{...secondaryMap};
+    primaryMap.forEach((key, value) {
+      if (value == null) return;
+      if (value is String) {
+        final trimmed = value.trim();
+        if (trimmed.isEmpty ||
+            trimmed.toLowerCase() == 'null' ||
+            trimmed.toLowerCase() == 'undefined') {
+          return;
+        }
+        result[key] = value;
+      } else if (value is Map && result[key] is Map) {
+        result[key] = _mergeNonEmptyMap(
+          JsonParsers.asMap(value),
+          JsonParsers.asMap(result[key]),
+        );
+      } else {
+        result[key] = value;
+      }
+    });
+    return result;
+  }
+
   Future<NurseUser> fetchMe() async {
     final res = await _client.get(endpoints.authMe);
-    final meObj = JsonParsers.extractObject(res);
-    // Also try `/api/auth/profile` if `/api/auth/me` omits extended staff profile fields
-    Map<String, dynamic> merged = meObj;
-    if (!meObj.containsKey('date_of_joining') &&
-        !meObj.containsKey('dateOfJoining') &&
-        !meObj.containsKey('qualification')) {
+    Map<String, dynamic> merged = _mergeNonEmptyMap(
+      JsonParsers.extractObject(res),
+      JsonParsers.asMap(res),
+    );
+    var parsed = NurseUser.fromJson(merged);
+
+    // Probe extended profile endpoints if photo or employment fields were omitted by `/api/auth/me`
+    final extraUrls = <String>[
+      endpoints.authProfile,
+      endpoints.usersProfile,
+      endpoints.profile,
+      if (parsed.id.isNotEmpty) endpoints.staffDetail(parsed.id),
+      if (parsed.id.isNotEmpty) endpoints.userDetail(parsed.id),
+    ];
+
+    for (final url in extraUrls) {
+      if (parsed.image != null &&
+          parsed.image!.trim().isNotEmpty &&
+          parsed.qualification.isNotEmpty) {
+        break;
+      }
       try {
-        final profRes = await _client.get(
-          endpoints.authProfile,
+        final extraRes = await _client.get(
+          url,
           timeout: const Duration(seconds: 6),
         );
-        final profObj = JsonParsers.extractObject(profRes);
-        if (profObj.isNotEmpty) {
-          merged = <String, dynamic>{...profObj, ...meObj};
+        final extraObj = _mergeNonEmptyMap(
+          JsonParsers.extractObject(extraRes),
+          JsonParsers.asMap(extraRes),
+        );
+        if (extraObj.isNotEmpty) {
+          merged = _mergeNonEmptyMap(merged, extraObj);
+          parsed = NurseUser.fromJson(merged);
         }
       } catch (_) {}
     }
-    return NurseUser.fromJson(merged);
+
+    // Final fallback: check `/api/staff` directory matching by ID, email, or employee code (`9008`)
+    if (parsed.image == null || parsed.image!.trim().isEmpty) {
+      try {
+        final staffRes = await _client.get(
+          endpoints.staffList,
+          timeout: const Duration(seconds: 6),
+        );
+        final staffItems = JsonParsers.extractList(staffRes);
+        for (final s in staffItems) {
+          final sid = JsonParsers.asId(s['_id'] ?? s['id']);
+          final semail = JsonParsers.asString(s['email']).toLowerCase();
+          final scode = JsonParsers.asString(
+            s['employee_id'] ?? s['employeeId'] ?? s['staff_id'],
+          );
+          final matches = (parsed.id.isNotEmpty && sid == parsed.id) ||
+              (parsed.email.isNotEmpty &&
+                  semail == parsed.email.toLowerCase()) ||
+              (parsed.staffCode.isNotEmpty && scode == parsed.staffCode);
+          if (matches) {
+            merged = _mergeNonEmptyMap(merged, s);
+            parsed = NurseUser.fromJson(merged);
+            break;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return parsed;
   }
 
   Future<NurseUser> updateProfile({
@@ -154,6 +228,10 @@ class NurseApiService {
         'image': image.trim(),
         'photo': image.trim(),
         'avatar': image.trim(),
+        'profilePhoto': image.trim(),
+        'profile_photo': image.trim(),
+        'profileImage': image.trim(),
+        'profile_image': image.trim(),
       },
     };
 

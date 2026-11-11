@@ -199,27 +199,50 @@ class NurseUser {
   }
 
   factory NurseUser.fromJson(Map<String, dynamic> json) {
+    final dataSub = json['data'] is Map
+        ? JsonParsers.asMap(json['data'])
+        : <String, dynamic>{};
     final userSub = json['user'] is Map
         ? JsonParsers.asMap(json['user'])
-        : <String, dynamic>{};
+        : (dataSub['user'] is Map
+            ? JsonParsers.asMap(dataSub['user'])
+            : <String, dynamic>{});
     final staffSub = json['staff'] is Map
         ? JsonParsers.asMap(json['staff'])
         : (userSub['staff'] is Map
             ? JsonParsers.asMap(userSub['staff'])
-            : <String, dynamic>{});
+            : (dataSub['staff'] is Map
+                ? JsonParsers.asMap(dataSub['staff'])
+                : <String, dynamic>{}));
+    final profileSub = json['profile'] is Map
+        ? JsonParsers.asMap(json['profile'])
+        : (userSub['profile'] is Map
+            ? JsonParsers.asMap(userSub['profile'])
+            : (dataSub['profile'] is Map
+                ? JsonParsers.asMap(dataSub['profile'])
+                : <String, dynamic>{}));
 
-    // Merge keys with priority: nested user -> nested staff -> root json
+    // Merge keys with non-empty values taking precedence
     final source = <String, dynamic>{
       ...json,
+      ...dataSub,
+      ...profileSub,
       ...staffSub,
       ...userSub,
     };
 
+    bool isMeaningful(String val) {
+      final t = val.trim();
+      if (t.isEmpty) return false;
+      final l = t.toLowerCase();
+      return l != 'null' && l != 'undefined' && l != 'none';
+    }
+
     String pickStr(List<String> keys, {String fallback = ''}) {
-      for (final m in [userSub, staffSub, json, source]) {
+      for (final m in [userSub, staffSub, profileSub, dataSub, json, source]) {
         for (final k in keys) {
           final v = JsonParsers.asString(m[k]);
-          if (v.isNotEmpty) return v;
+          if (isMeaningful(v)) return v;
         }
       }
       return fallback;
@@ -258,6 +281,31 @@ class NurseUser {
       'avatar',
       'profilePhoto',
       'profile_photo',
+      'profileImage',
+      'profile_image',
+      'profilePic',
+      'profile_pic',
+      'profilePicture',
+      'profile_picture',
+      'photoUrl',
+      'photo_url',
+      'imageUrl',
+      'image_url',
+      'avatarUrl',
+      'avatar_url',
+      'staff_photo',
+      'staffPhoto',
+      'staff_image',
+      'staffImage',
+      'user_photo',
+      'userPhoto',
+      'user_image',
+      'userImage',
+      'picture',
+      'img',
+      'file',
+      'filePath',
+      'file_path',
     ]);
 
     final rawDobVal = source['dob'] ??

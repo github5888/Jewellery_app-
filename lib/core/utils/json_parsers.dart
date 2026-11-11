@@ -6,8 +6,16 @@ class JsonParsers {
     if (value is String) return value.trim();
     if (value is num || value is bool) return value.toString();
     if (value is Map) {
-      // Handle populated Mongoose refs seamlessly (e.g. bed: { _id, name })
+      // Handle populated Mongoose refs & media objects seamlessly
       for (final key in const [
+        'url',
+        'secure_url',
+        'path',
+        'filePath',
+        'file_path',
+        'src',
+        'location',
+        'filename',
         'name',
         'title',
         'patient_name',
