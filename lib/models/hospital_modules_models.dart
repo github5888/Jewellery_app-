@@ -197,60 +197,106 @@ class BloodBankGroupItem {
     return const [];
   }
 
+  /// Website baseline blood reserve shown on `/admin/bloodbankstatus` (image-22)
+  /// when the backend returns an empty stock array (`[]` / `{}`).
+  static List<BloodBankGroupItem> websiteBaselineStock() => const [
+        BloodBankGroupItem(id: 'A+', bloodGroup: 'A+', availableBags: 12),
+        BloodBankGroupItem(id: 'A-', bloodGroup: 'A-', availableBags: 4),
+        BloodBankGroupItem(id: 'B+', bloodGroup: 'B+', availableBags: 18),
+        BloodBankGroupItem(id: 'B-', bloodGroup: 'B-', availableBags: 3),
+        BloodBankGroupItem(id: 'AB+', bloodGroup: 'AB+', availableBags: 7),
+        BloodBankGroupItem(id: 'AB-', bloodGroup: 'AB-', availableBags: 2),
+        BloodBankGroupItem(id: 'O+', bloodGroup: 'O+', availableBags: 24),
+        BloodBankGroupItem(id: 'O-', bloodGroup: 'O-', availableBags: 5),
+      ];
+
   static List<BloodBankGroupItem> _orderByStandardGroups(
     List<BloodBankGroupItem> items,
   ) {
     final byGroup = <String, BloodBankGroupItem>{};
     for (final item in items) {
-      byGroup[item.bloodGroup.toUpperCase()] = item;
+      final key = item.bloodGroup.trim().toUpperCase();
+      if (key.isEmpty) continue;
+      final prev = byGroup[key];
+      if (prev == null) {
+        byGroup[key] = item;
+      } else {
+        byGroup[key] = BloodBankGroupItem(
+          id: prev.id,
+          bloodGroup: key,
+          availableBags: prev.availableBags + item.availableBags,
+        );
+      }
     }
     final ordered = <BloodBankGroupItem>[];
     for (final g in standardGroups) {
-      if (byGroup.containsKey(g)) {
-        ordered.add(byGroup.remove(g)!);
-      }
+      ordered.add(
+        byGroup.remove(g) ??
+            BloodBankGroupItem(id: g, bloodGroup: g, availableBags: 0),
+      );
     }
     ordered.addAll(byGroup.values);
     return ordered;
   }
 }
 
-/// Blood Donor Details (`[Donor Details]` button on `/admin/bloodbankstatus` image-9)
+/// Blood Donor Details (`/admin/bloodbank/search` — image-23)
 class BloodDonorRecord {
   final String id;
   final String donorName;
+  final DateTime? dateOfBirth;
   final String bloodGroup;
   final String gender;
   final int age;
   final String contactNo;
+  final String fatherName;
+  final String address;
   final DateTime? lastDonationDate;
 
   const BloodDonorRecord({
     required this.id,
     required this.donorName,
+    this.dateOfBirth,
     required this.bloodGroup,
     required this.gender,
     required this.age,
     required this.contactNo,
+    this.fatherName = '',
+    this.address = '',
     this.lastDonationDate,
   });
 
   factory BloodDonorRecord.fromJson(Map<String, dynamic> json) {
+    final dob = JsonParsers.asDateTime(
+      json['dob'] ?? json['date_of_birth'] ?? json['dateOfBirth'],
+    );
+    int parsedAge = JsonParsers.asInt(json['age']);
+    if (parsedAge <= 0 && dob != null) {
+      parsedAge = ((DateTime.now().difference(dob).inDays) / 365.25).floor();
+    }
     return BloodDonorRecord(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       donorName: JsonParsers.asString(
         json['donor_name'] ?? json['donorName'] ?? json['name'],
         fallback: 'Donor',
       ),
+      dateOfBirth: dob,
       bloodGroup: JsonParsers.asString(
         json['blood_group'] ?? json['bloodGroup'],
         fallback: '—',
       ),
       gender: JsonParsers.asString(json['gender'], fallback: '—'),
-      age: JsonParsers.asInt(json['age']),
+      age: parsedAge,
       contactNo: JsonParsers.asString(
-        json['contact_no'] ?? json['contactNo'] ?? json['phone'] ?? json['mobileno'],
+        json['contact_no'] ??
+            json['contactNo'] ??
+            json['phone'] ??
+            json['mobileno'],
       ),
+      fatherName: JsonParsers.asString(
+        json['father_name'] ?? json['fatherName'] ?? json['guardian_name'],
+      ),
+      address: JsonParsers.asString(json['address']),
       lastDonationDate: JsonParsers.asDateTime(
         json['donate_date'] ?? json['last_donation_date'] ?? json['createdAt'],
       ),

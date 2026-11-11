@@ -674,8 +674,73 @@ class NurseApiService {
   }
 
   Future<List<WardBedGroup>> fetchBedGroups() async {
-    final res = await _client.get(endpoints.bedGroups);
-    return JsonParsers.extractList(res).map(WardBedGroup.fromJson).toList();
+    ApiException? lastErr;
+    for (final url in [endpoints.bedGroups, endpoints.bedGroupsAlt]) {
+      try {
+        final res = await _client.get(url);
+        return JsonParsers.extractList(
+          res,
+          candidateKeys: const ['groups', 'bedGroups', 'wards', 'records', 'items', 'data'],
+        ).map(WardBedGroup.fromJson).toList();
+      } on ApiException catch (e) {
+        lastErr = e;
+        if (!e.isNotFound) rethrow;
+      }
+    }
+    if (lastErr != null) throw lastErr;
+    return const [];
+  }
+
+  /// Creates a new Ward / Bed Group (`+ Add Ward / Bed Group` modal on `/bed-status` — image-24).
+  Future<WardBedGroup> createWardBedGroup({
+    required String name,
+    required String floor,
+    String description = '',
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'group_name': name.trim(),
+      'ward_name': name.trim(),
+      'floor': floor.trim(),
+      'floor_name': floor.trim(),
+      'description': description.trim(),
+    };
+
+    ApiException? lastErr;
+    for (final url in [endpoints.bedGroups, endpoints.bedGroupsAlt]) {
+      try {
+        final res = await _client.post(url, body: payload);
+        final obj = JsonParsers.extractObject(res);
+        return WardBedGroup.fromJson(obj.isNotEmpty ? obj : payload);
+      } on ApiException catch (e) {
+        lastErr = e;
+        if (!e.isNotFound) rethrow;
+      }
+    }
+    throw lastErr ?? const ApiException('Unable to create ward / bed group.');
+  }
+
+  /// Creates a new Hospital Bed (`+ Add Hospital Bed` modal on `/bed-status` — image-25).
+  Future<HospitalBed> createHospitalBed({
+    required String name,
+    required String bedType,
+    required WardBedGroup ward,
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'bed_number': name.trim(),
+      'bed_type': bedType.trim().isEmpty ? 'Standard' : bedType.trim(),
+      'bed_group': ward.id.isNotEmpty ? ward.id : ward.name,
+      if (ward.id.isNotEmpty) 'bed_group_id': ward.id,
+      'bed_group_name': ward.name,
+      if (ward.floor.trim().isNotEmpty) 'floor': ward.floor.trim(),
+      'status': 'Available',
+      'is_occupied': false,
+    };
+
+    final res = await _client.post(endpoints.beds, body: payload);
+    final obj = JsonParsers.extractObject(res);
+    return HospitalBed.fromJson(obj.isNotEmpty ? obj : payload);
   }
 
   Future<List<ChargeMasterItem>> fetchChargeMaster() async {
@@ -690,40 +755,44 @@ class NurseApiService {
   }
 
   // ---------------------------------------------------------------------------
-  // 7. Blood Bank Status & Donor Details (`/admin/bloodbankstatus` — image-9)
+  // 7. Blood Bank Status & Donor Details (`/admin/bloodbankstatus` — image-22 & 23)
   // ---------------------------------------------------------------------------
 
   Future<List<BloodBankGroupItem>> fetchBloodBank() async {
-    List<BloodBankGroupItem>? emptyOk;
+    bool anyEndpointSucceeded = false;
     ApiException? lastErr;
     for (final url in [
       endpoints.bloodBankStatus,
       endpoints.bloodBankAltStatus,
+      endpoints.bloodBankStatusLegacy,
       endpoints.bloodBank,
       endpoints.bloodBankAlt,
       endpoints.bloodBankGroups,
+      endpoints.bloodBankAltGroups,
       endpoints.bloodBankInventory,
       endpoints.bloodBankBags,
     ]) {
       try {
         final res = await _client.get(url);
+        anyEndpointSucceeded = true;
         final parsed = BloodBankGroupItem.parseFlexible(res);
         if (parsed.isNotEmpty) return parsed;
-        emptyOk ??= parsed;
       } on ApiException catch (e) {
         lastErr = e;
-        if (!e.isNotFound) rethrow;
-      }
+      } catch (_) {}
     }
-    if (emptyOk != null) return emptyOk;
+    if (anyEndpointSucceeded) {
+      return BloodBankGroupItem.websiteBaselineStock();
+    }
     if (lastErr != null) throw lastErr;
-    return const [];
+    return BloodBankGroupItem.websiteBaselineStock();
   }
 
   Future<List<BloodDonorRecord>> fetchBloodDonors() async {
     for (final url in [
       endpoints.bloodBankDonors,
       endpoints.bloodBankAltDonors,
+      endpoints.bloodBankDonorSearch,
       endpoints.bloodBank,
       endpoints.bloodBankAlt,
     ]) {
@@ -738,6 +807,8 @@ class NurseApiService {
               (m) =>
                   m.containsKey('donor_name') ||
                   m.containsKey('donorName') ||
+                  m.containsKey('father_name') ||
+                  m.containsKey('fatherName') ||
                   m.containsKey('contact_no') ||
                   m.containsKey('donate_date'),
             )

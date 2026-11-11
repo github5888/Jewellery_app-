@@ -63,19 +63,23 @@ class ApiEndpoints {
   // 6. Beds & Ward Groups
   String get beds => _url('/api/beds');
   String get bedGroups => _url('/api/beds/groups');
+  String get bedGroupsAlt => _url('/api/bed-groups');
   String get charges => _url('/api/charges');
   String get uploads => _url('/api/uploads');
 
   // 7. Blood Bank Status & Donors
   String get bloodBankStatus => _url('/api/blood-bank/status');
   String get bloodBankAltStatus => _url('/api/bloodbank/status');
+  String get bloodBankStatusLegacy => _url('/api/bloodbankstatus');
   String get bloodBank => _url('/api/blood-bank');
   String get bloodBankAlt => _url('/api/bloodbank');
   String get bloodBankGroups => _url('/api/blood-bank/groups');
+  String get bloodBankAltGroups => _url('/api/bloodbank/groups');
   String get bloodBankInventory => _url('/api/blood-bank/inventory');
   String get bloodBankBags => _url('/api/blood-bank/bags');
   String get bloodBankDonors => _url('/api/blood-bank/donors');
   String get bloodBankAltDonors => _url('/api/bloodbank/donors');
+  String get bloodBankDonorSearch => _url('/api/bloodbank/search');
 
   // 8. Duty Roster & Shifts
   String get dutyRoster => _url('/api/dutyroster');

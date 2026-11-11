@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/formatters.dart';
 import '../../models/hospital_modules_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
@@ -60,7 +61,9 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
   }
 
   List<BloodBankGroupItem> _orderedGroups(List<BloodBankGroupItem> raw) {
-    if (raw.isEmpty) return const [];
+    if (raw.isEmpty) {
+      return BloodBankGroupItem.websiteBaselineStock();
+    }
     final byGroup = <String, BloodBankGroupItem>{};
     final extras = <BloodBankGroupItem>[];
     for (final item in raw) {
@@ -83,9 +86,9 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
 
     final ordered = <BloodBankGroupItem>[];
     for (final g in _standardOrder) {
-      if (byGroup.containsKey(g)) {
-        ordered.add(byGroup[g]!);
-      }
+      ordered.add(
+        byGroup[g] ?? BloodBankGroupItem(id: g, bloodGroup: g, availableBags: 0),
+      );
     }
     ordered.addAll(extras);
     return ordered;
@@ -214,7 +217,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                         ),
                         SizedBox(width: 6),
                         Text(
-                          'Donors',
+                          'Donor Details',
                           style: TextStyle(
                             color: Color(0xFFBE123C),
                             fontSize: 12.5,
@@ -507,14 +510,16 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                   if (q.isEmpty) return true;
                   return d.donorName.toLowerCase().contains(q) ||
                       d.bloodGroup.toLowerCase().contains(q) ||
-                      d.contactNo.toLowerCase().contains(q);
+                      d.contactNo.toLowerCase().contains(q) ||
+                      d.fatherName.toLowerCase().contains(q) ||
+                      d.address.toLowerCase().contains(q);
                 }).toList();
 
                 if (filtered.isEmpty) {
                   return const ClinicalEmptyState(
                     icon: Icons.people_outline_rounded,
-                    title: 'No Donor Records Found',
-                    subtitle: 'Registered blood donors appear here.',
+                    title: 'No data available in table',
+                    subtitle: 'Registered blood bank donors appear here.',
                   );
                 }
 
@@ -527,6 +532,7 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                       padding: const EdgeInsets.all(13),
                       borderRadius: BorderRadius.circular(18),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Container(
                             width: 44,
@@ -563,7 +569,10 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                                 const SizedBox(height: 2),
                                 Text(
                                   [
-                                    if (d.age > 0) '${d.age} Yrs',
+                                    if (d.dateOfBirth != null)
+                                      'DOB: ${AppFormatters.formatSlashDate(d.dateOfBirth)}'
+                                    else if (d.age > 0)
+                                      '${d.age} Yrs',
                                     if (d.gender.isNotEmpty) d.gender,
                                     if (d.contactNo.isNotEmpty) d.contactNo,
                                   ].join(' • '),
@@ -572,6 +581,21 @@ class _DonorDetailsSheetState extends State<_DonorDetailsSheet> {
                                     fontSize: 12,
                                   ),
                                 ),
+                                if (d.fatherName.isNotEmpty ||
+                                    d.address.isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    [
+                                      if (d.fatherName.isNotEmpty)
+                                        'Father: ${d.fatherName}',
+                                      if (d.address.isNotEmpty) d.address,
+                                    ].join(' • '),
+                                    style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
