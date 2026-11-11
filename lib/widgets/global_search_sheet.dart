@@ -5,6 +5,7 @@ import '../models/ipd_models.dart';
 import '../models/opd_models.dart';
 import '../models/patient_directory_model.dart';
 import '../screens/patients/ipd_patient_detail_screen.dart';
+import '../screens/patients/patient_detail_screen.dart';
 import '../screens/vitals/record_vitals_screen.dart';
 import '../state/nurse_portal_controller.dart';
 import 'patient_avatar.dart';
@@ -241,8 +242,14 @@ class _GlobalSearchSheetBodyState extends State<_GlobalSearchSheetBody> {
                           style: const TextStyle(fontSize: 12),
                         ),
                         onTap: () {
-                          Navigator.of(context).pop();
-                          controller.setSelectedNavIndex(NurseNavIndex.patients);
+                          final nav = Navigator.of(context);
+                          nav.pop();
+                          nav.push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  PatientDetailScreen(initialPatient: p),
+                            ),
+                          );
                         },
                       ),
                     ),

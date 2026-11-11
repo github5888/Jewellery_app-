@@ -36,12 +36,23 @@ class ApiEndpoints {
   // 2. Nurse Dashboard
   String get dashboard => _url('/api/dashboard');
 
-  // 3. Patient Directory & ABHA Queue
+  // 3. Patient Directory & ABHA M1 / Queue
   String get patients => _url('/api/patients');
   String patientDetail(String patientId) => _url('/api/patients/$patientId');
+  String patientAbha(String patientId) => _url('/api/patients/$patientId/abha');
   String get abha => _url('/api/abha');
   String get abhaScanShare => _url('/api/abha/scan-share');
   String get abhaQueue => _url('/api/abha/queue');
+  String get abhaAadhaarGenerateOtp => _url('/api/abha/aadhaar/generate-otp');
+  String get abhaAadhaarVerifyOtp => _url('/api/abha/aadhaar/verify-otp');
+  String get abhaMobileGenerateOtp => _url('/api/abha/mobile/generate-otp');
+  String get abhaMobileVerifyOtp => _url('/api/abha/mobile/verify-otp');
+  String get abhaSearch => _url('/api/abha/search');
+  String get abhaAddressGenerateOtp => _url('/api/abha/address/generate-otp');
+  String get abhaAddressVerifyOtp => _url('/api/abha/address/verify-otp');
+  String get abhaGenerateOtp => _url('/api/abha/generate-otp');
+  String get abhaVerifyOtp => _url('/api/abha/verify-otp');
+  String get abhaLink => _url('/api/abha/link');
 
   // 4. OPD - Out Patient & Triage Vitals
   String get opdList => _url('/api/opd');
@@ -93,7 +104,15 @@ class ApiEndpoints {
   String get holidayAlt => _url('/api/holiday');
   String get calendar => _url('/api/calendar');
 
-  // 10. Notifications, Pathology/Radiology & Protected Report Files
+  // 10. Notifications, Pathology/Radiology, Appointments, Billing & Report Files
+  String get appointments => _url('/api/appointments');
+  String get pharmacy => _url('/api/pharmacy');
+  String get pharmacyBills => _url('/api/pharmacy/bills');
+  String get billing => _url('/api/billing');
+  String get invoices => _url('/api/invoices');
+  String get payments => _url('/api/payments');
+  String get bloodBankIssues => _url('/api/blood-bank/issues');
+  String get bloodBankAltIssues => _url('/api/bloodbank/issues');
   String get pathology => _url('/api/pathology');
   String get pathologyBills => _url('/api/pathology/bills');
   String get radiology => _url('/api/radiology');

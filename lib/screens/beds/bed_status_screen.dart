@@ -671,13 +671,10 @@ class _AddHospitalBedDialog extends StatefulWidget {
 class _AddHospitalBedDialogState extends State<_AddHospitalBedDialog> {
   static const List<String> _defaultBedTypes = [
     'Standard',
-    'ICU',
-    'Ventilator',
-    'VIP',
-    'Private',
-    'Semi-Private',
-    'Emergency',
-    'General',
+    'Ventilator / ICU',
+    'Semi-Fowler',
+    'Full-Fowler',
+    'Pediatric',
   ];
 
   final _bedNameCtrl = TextEditingController();

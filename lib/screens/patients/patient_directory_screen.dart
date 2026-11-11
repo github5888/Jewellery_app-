@@ -5,6 +5,8 @@ import '../../core/utils/formatters.dart';
 import '../../models/patient_directory_model.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
+import 'patient_abha_modal.dart';
+import 'patient_detail_screen.dart';
 
 /// Executive Mobile Patient Directory Screen (`GET /api/patients`):
 /// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader`
@@ -43,7 +45,22 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
     'O+',
     'O-',
   ];
-  static const _sortOptions = ['Default', 'Name (A-Z)', 'UHID', 'Age'];
+  static const _sortOptions = [
+    'Default',
+    'Patient Name',
+    'Patient ID',
+    'Due Balance',
+    'Age',
+  ];
+
+  static int _compareUhid(String a, String b) {
+    final numA = int.tryParse(a.replaceAll(RegExp(r'[^0-9]'), ''));
+    final numB = int.tryParse(b.replaceAll(RegExp(r'[^0-9]'), ''));
+    if (numA != null && numB != null && numA != numB) {
+      return numA.compareTo(numB);
+    }
+    return a.toLowerCase().compareTo(b.toLowerCase());
+  }
 
   @override
   void dispose() {
@@ -86,14 +103,16 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
       return true;
     }).toList();
 
-    if (_selectedSort == 'Name (A-Z)') {
+    if (_selectedSort == 'Patient Name') {
       filtered.sort(
         (a, b) => a.patientName.toLowerCase().compareTo(
               b.patientName.toLowerCase(),
             ),
       );
-    } else if (_selectedSort == 'UHID') {
-      filtered.sort((a, b) => a.patientUniqueId.compareTo(b.patientUniqueId));
+    } else if (_selectedSort == 'Patient ID') {
+      filtered.sort((a, b) => _compareUhid(a.patientUniqueId, b.patientUniqueId));
+    } else if (_selectedSort == 'Due Balance') {
+      filtered.sort((a, b) => b.dueBalance.compareTo(a.dueBalance));
     } else if (_selectedSort == 'Age') {
       filtered.sort((a, b) => b.age.compareTo(a.age));
     }
@@ -220,7 +239,8 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
                 patient: patient,
                 sharedPhoneCount: sharedCount,
                 primaryColor: primary,
-                onView: () => _showPatientDetailSheet(context, patient),
+                onView: () => _openPatientProfile(context, patient),
+                onAbha: () => _openAbhaModal(context, patient),
               );
             }),
         ],
@@ -243,155 +263,33 @@ class _PatientDirectoryScreenState extends State<PatientDirectoryScreen> {
     );
   }
 
-  void _showPatientDetailSheet(
+  Future<void> _openPatientProfile(
     BuildContext context,
     PatientDirectoryRecord patient,
-  ) {
+  ) async {
     final controller = NursePortalScope.read(context);
-    final primary = controller.personalTheme.primaryColor;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-          ),
-          child: FutureBuilder<PatientDirectoryRecord>(
-            future: controller.api.fetchPatientDetail(patient.id),
-            builder: (context, snapshot) {
-              final p = snapshot.data ?? patient;
-
-              return DraggableScrollableSheet(
-                initialChildSize: 0.74,
-                minChildSize: 0.5,
-                maxChildSize: 0.92,
-                expand: false,
-                builder: (_, scrollCtrl) {
-                  return ListView(
-                    controller: scrollCtrl,
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4.5,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCBD5E1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [primary, primary.withAlpha(190)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: Text(
-                                p.initials,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    p.patientName,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w900,
-                                      letterSpacing: -0.4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${p.patientUniqueId}  •  ${p.age > 0 ? "${p.age} Yrs" : "-"}  •  ${p.gender}',
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.close_rounded),
-                              onPressed: () => Navigator.of(ctx).pop(),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (snapshot.connectionState == ConnectionState.waiting)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 10),
-                          child: LinearProgressIndicator(),
-                        ),
-                      const SizedBox(height: 16),
-                      _DetailFieldRow('UHID', p.patientUniqueId),
-                      _DetailFieldRow(
-                        'Mobile Number',
-                        p.phone.isEmpty ? '—' : p.phone,
-                      ),
-                      _DetailFieldRow(
-                        'Blood Group',
-                        p.bloodGroup.isEmpty ? '—' : p.bloodGroup,
-                      ),
-                      _DetailFieldRow(
-                        'Guardian Name',
-                        p.guardianName.trim().isEmpty ? '—' : p.guardianName,
-                      ),
-                      _DetailFieldRow(
-                        'Residential Address',
-                        p.address.trim().isEmpty ? '—' : p.address,
-                      ),
-                      _DetailFieldRow(
-                        'ABHA Health ID',
-                        p.hasAbha ? p.abhaNumber : 'Not Linked',
-                      ),
-                      if (p.abhaAddress.isNotEmpty)
-                        _DetailFieldRow('ABHA Address', p.abhaAddress),
-                      if (p.knownAllergies.isNotEmpty)
-                        _DetailFieldRow('Known Allergies', p.knownAllergies),
-                      _DetailFieldRow(
-                        'Outstanding Balance',
-                        AppFormatters.formatCurrencyTwoDecimals(p.dueBalance),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
-          ),
-        );
-      },
+    final updated = await Navigator.of(context).push<PatientDirectoryRecord>(
+      MaterialPageRoute(
+        builder: (_) => PatientDetailScreen(initialPatient: patient),
+      ),
     );
+    if (updated != null && mounted) {
+      controller.updateCachedPatientRecord(updated);
+    }
+  }
+
+  Future<void> _openAbhaModal(
+    BuildContext context,
+    PatientDirectoryRecord patient,
+  ) async {
+    final controller = NursePortalScope.read(context);
+    final updated = await showPatientAbhaModal(
+      context,
+      patient: patient,
+    );
+    if (updated != null && mounted) {
+      controller.updateCachedPatientRecord(updated);
+    }
   }
 }
 
@@ -471,6 +369,7 @@ class _PatientDirectoryCard extends StatelessWidget {
   final int sharedPhoneCount;
   final Color primaryColor;
   final VoidCallback onView;
+  final VoidCallback onAbha;
 
   const _PatientDirectoryCard({
     required this.index,
@@ -478,6 +377,7 @@ class _PatientDirectoryCard extends StatelessWidget {
     required this.sharedPhoneCount,
     required this.primaryColor,
     required this.onView,
+    required this.onAbha,
   });
 
   @override
@@ -601,15 +501,18 @@ class _PatientDirectoryCard extends StatelessWidget {
                                 vertical: 2.5,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.successSoft,
+                                color: const Color(0xFFE0F2FE),
                                 borderRadius: BorderRadius.circular(7),
                               ),
-                              child: const Text(
-                                '✓ ABHA Linked',
-                                style: TextStyle(
-                                  color: Color(0xFF059669),
+                              child: Text(
+                                patient.abhaNumber.isNotEmpty
+                                    ? '🪪 ${patient.abhaNumber}'
+                                    : '✓ ABHA Linked',
+                                style: const TextStyle(
+                                  color: Color(0xFF0369A1),
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w800,
+                                  fontFeatures: AppTheme.tabularNums,
                                 ),
                               ),
                             ),
@@ -706,12 +609,82 @@ class _PatientDirectoryCard extends StatelessWidget {
                     ],
                   ],
                   const Spacer(),
-                  Text(
-                    'Details ›',
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onView,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.5,
+                        vertical: 4.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: primaryColor.withAlpha(18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.visibility_outlined,
+                            size: 12.5,
+                            color: primaryColor,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'View',
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: onAbha,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8.5,
+                        vertical: 4.5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: patient.hasAbha
+                            ? const Color(0xFFE0F2FE)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: patient.hasAbha
+                              ? const Color(0xFF7DD3FC)
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.badge_outlined,
+                            size: 12.5,
+                            color: patient.hasAbha
+                                ? const Color(0xFF0369A1)
+                                : AppColors.textPrimary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            patient.hasAbha ? 'ABHA Card' : '+ ABHA',
+                            style: TextStyle(
+                              color: patient.hasAbha
+                                  ? const Color(0xFF0369A1)
+                                  : AppColors.textPrimary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],
@@ -719,52 +692,6 @@ class _PatientDirectoryCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _DetailFieldRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _DetailFieldRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(13),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 130,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

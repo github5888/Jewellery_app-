@@ -710,6 +710,21 @@ class NursePortalController extends ChangeNotifier {
   // Live Workspace Synchronization (100% Website Parity)
   // ---------------------------------------------------------------------------
 
+  void updateCachedPatientRecord(PatientDirectoryRecord updated) {
+    final idx = _patientDirectory.indexWhere(
+      (p) =>
+          (updated.id.isNotEmpty && p.id == updated.id) ||
+          (updated.patientUniqueId.isNotEmpty &&
+              p.patientUniqueId == updated.patientUniqueId),
+    );
+    if (idx != -1) {
+      final copy = List<PatientDirectoryRecord>.from(_patientDirectory);
+      copy[idx] = updated;
+      _patientDirectory = copy;
+      notifyListeners();
+    }
+  }
+
   Future<void> refreshWorkspace({bool silent = false}) async {
     if (_authStage != AuthStage.authenticated) return;
     if (!silent) {

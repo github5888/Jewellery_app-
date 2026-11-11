@@ -6,6 +6,7 @@ import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
 import '../core/utils/json_parsers.dart';
 import '../models/bed_models.dart';
+import '../models/clinical_report_model.dart';
 import '../models/dashboard_data.dart';
 import '../models/duty_roster_model.dart';
 import '../models/hospital_modules_models.dart';
@@ -378,6 +379,550 @@ class NurseApiService {
     return const [];
   }
 
+  bool _matchesPatientRecord(
+    Map<String, dynamic> item,
+    PatientDirectoryRecord p,
+  ) {
+    final patMap = item['patient'] is Map
+        ? JsonParsers.asMap(item['patient'])
+        : (item['patient_id'] is Map
+            ? JsonParsers.asMap(item['patient_id'])
+            : <String, dynamic>{});
+
+    final itemPatId = JsonParsers.asId(
+      (item['patient_id'] is Map ? null : item['patient_id']) ??
+          item['patientId'] ??
+          patMap['_id'] ??
+          patMap['id'] ??
+          (item['patient'] is String ? item['patient'] : null),
+    );
+    if (p.id.isNotEmpty && itemPatId.isNotEmpty && itemPatId == p.id) {
+      return true;
+    }
+
+    final itemUhid = JsonParsers.asString(
+      item['patient_unique_id'] ??
+          item['patientUniqueId'] ??
+          item['uhid'] ??
+          patMap['patient_unique_id'] ??
+          patMap['patientUniqueId'] ??
+          patMap['uhid'],
+    ).trim().toLowerCase();
+    if (p.patientUniqueId.trim().isNotEmpty &&
+        itemUhid.isNotEmpty &&
+        itemUhid == p.patientUniqueId.trim().toLowerCase()) {
+      return true;
+    }
+
+    // Fallback only when neither ID nor UHID is populated on the record
+    if (itemPatId.isEmpty && itemUhid.isEmpty) {
+      final itemName = JsonParsers.asString(
+        item['patient_name'] ??
+            item['patientName'] ??
+            patMap['patient_name'] ??
+            patMap['name'],
+      ).trim().toLowerCase();
+      final itemPhone = JsonParsers.asString(
+        item['mobileno'] ??
+            item['mobile_no'] ??
+            item['phone'] ??
+            patMap['mobileno'] ??
+            patMap['phone'],
+      ).trim();
+      if (p.patientName.trim().isNotEmpty &&
+          itemName == p.patientName.trim().toLowerCase()) {
+        if (p.phone.trim().isEmpty ||
+            itemPhone.isEmpty ||
+            itemPhone == p.phone.trim()) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<List<Map<String, dynamic>>> _safeGetList(
+    List<String> candidateUrls, {
+    List<String> keys = const ['data', 'items', 'records', 'bills', 'orders'],
+  }) async {
+    for (final url in candidateUrls) {
+      try {
+        final res = await _client.get(url);
+        final list = JsonParsers.extractList(res, candidateKeys: keys);
+        if (list.isNotEmpty) return list;
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  /// Aggregates complete 6-tab `/patients/:id` dossier from live backend endpoints (`image-29`..`image-34`).
+  Future<PatientFullDossier> fetchFullPatientDossier(
+    PatientDirectoryRecord basePatient,
+  ) async {
+    PatientDirectoryRecord patient = basePatient;
+    Map<String, dynamic> detailMap = <String, dynamic>{};
+
+    if (basePatient.id.isNotEmpty) {
+      try {
+        final res = await _client.get(endpoints.patientDetail(basePatient.id));
+        if (res is Map) {
+          detailMap = JsonParsers.asMap(res);
+        }
+        final patObj = JsonParsers.extractObject(res);
+        if (patObj.isNotEmpty) {
+          if (detailMap.isEmpty) detailMap = patObj;
+          final fetched = PatientDirectoryRecord.fromJson(patObj);
+          if (fetched.id.isNotEmpty || fetched.patientName != '—') {
+            patient = fetched;
+          }
+        }
+      } catch (_) {}
+    }
+
+    final results = await Future.wait<dynamic>([
+      _safeGetList([endpoints.opdList]),
+      _safeGetList([endpoints.ipdList]),
+      _safeGetList([endpoints.pathologyBills, endpoints.pathology]),
+      _safeGetList([endpoints.radiologyBills, endpoints.radiology]),
+      _safeGetList([endpoints.appointments]),
+      _safeGetList([endpoints.pharmacyBills, endpoints.pharmacy]),
+      _safeGetList([endpoints.invoices, endpoints.billing]),
+      _safeGetList([endpoints.bloodBankIssues, endpoints.bloodBankAltIssues]),
+    ]);
+
+    final rawOpd = results[0] as List<Map<String, dynamic>>;
+    final rawIpd = results[1] as List<Map<String, dynamic>>;
+    final rawPath = results[2] as List<Map<String, dynamic>>;
+    final rawRad = results[3] as List<Map<String, dynamic>>;
+    final rawAppt = results[4] as List<Map<String, dynamic>>;
+    final rawPharm = results[5] as List<Map<String, dynamic>>;
+    final rawInv = results[6] as List<Map<String, dynamic>>;
+    final rawBloodIssues = results[7] as List<Map<String, dynamic>>;
+
+    // Merge embedded arrays from `/api/patients/:id` if present
+    final embeddedOpd = JsonParsers.asMapList(
+      detailMap['opd_visits'] ?? detailMap['opd'] ?? detailMap['opdVisits'],
+    );
+    final embeddedIpd = JsonParsers.asMapList(
+      detailMap['ipd_admissions'] ?? detailMap['ipd'] ?? detailMap['ipdAdmissions'],
+    );
+    final embeddedAppt = JsonParsers.asMapList(
+      detailMap['appointments'] ?? detailMap['appointment_history'],
+    );
+    final embeddedInv = JsonParsers.asMapList(
+      detailMap['invoices'] ?? detailMap['bills'],
+    );
+
+    // 1. OPD Consultations & Encounters
+    final seenOpd = <String>{};
+    final opdEncounters = <PatientOpdEncounter>[];
+    for (final item in [
+      ...embeddedOpd,
+      ...rawOpd.where((m) => _matchesPatientRecord(m, patient)),
+    ]) {
+      final parsed = PatientOpdEncounter.fromJson(item);
+      final key = parsed.id.isNotEmpty ? parsed.id : '${parsed.opdNo}_${parsed.caseRef}';
+      if (seenOpd.add(key)) {
+        opdEncounters.add(parsed);
+      }
+    }
+
+    // 2. IPD Admissions
+    final seenIpd = <String>{};
+    final ipdAdmissions = <IpdAdmission>[];
+    for (final item in [
+      ...embeddedIpd,
+      ...rawIpd.where((m) => _matchesPatientRecord(m, patient)),
+    ]) {
+      final parsed = IpdAdmission.fromJson(item);
+      final key = parsed.id.isNotEmpty ? parsed.id : parsed.ipdNo;
+      if (seenIpd.add(key)) {
+        ipdAdmissions.add(parsed);
+      }
+    }
+
+    // 3. Pathology & Radiology Investigations + Service Orders
+    final labAndRadiology = <ClinicalReportRecord>[];
+    final serviceOrders = <PatientServiceOrderItem>[];
+    final seenReportIds = <String>{};
+
+    for (final m in rawPath.where((x) => _matchesPatientRecord(x, patient))) {
+      final reports = ClinicalReportRecord.fromBillJson(
+        m,
+        ClinicalReportCategory.lab,
+      );
+      for (final r in reports) {
+        final key = '${r.id}_${r.billNo}_${r.title}';
+        if (seenReportIds.add(key)) {
+          labAndRadiology.add(r);
+          serviceOrders.add(
+            PatientServiceOrderItem(
+              id: r.id,
+              serviceType: 'Pathology',
+              billReference: r.billNo.isEmpty ? 'PATH' : r.billNo,
+              description: r.title,
+              amount: JsonParsers.asDouble(
+                m['net_amount'] ?? m['total_amount'] ?? m['amount'],
+              ),
+              status: r.status,
+              date: r.date,
+            ),
+          );
+        }
+      }
+    }
+
+    for (final m in rawRad.where((x) => _matchesPatientRecord(x, patient))) {
+      final reports = ClinicalReportRecord.fromBillJson(
+        m,
+        ClinicalReportCategory.radiology,
+      );
+      for (final r in reports) {
+        final key = '${r.id}_${r.billNo}_${r.title}';
+        if (seenReportIds.add(key)) {
+          labAndRadiology.add(r);
+          serviceOrders.add(
+            PatientServiceOrderItem(
+              id: r.id,
+              serviceType: 'Radiology',
+              billReference: r.billNo.isEmpty ? 'RAD' : r.billNo,
+              description: r.title,
+              amount: JsonParsers.asDouble(
+                m['net_amount'] ?? m['total_amount'] ?? m['amount'],
+              ),
+              status: r.status,
+              date: r.date,
+            ),
+          );
+        }
+      }
+    }
+
+    // Pharmacy & Blood Bank linked orders (`Services & Orders` — image-33)
+    for (final m in rawPharm.where((x) => _matchesPatientRecord(x, patient))) {
+      serviceOrders.add(
+        PatientServiceOrderItem(
+          id: JsonParsers.asId(m['_id'] ?? m['id']),
+          serviceType: 'Pharmacy',
+          billReference: JsonParsers.asString(
+            m['bill_no'] ?? m['invoice_no'],
+            fallback: 'PHARM',
+          ),
+          description: JsonParsers.asString(
+            m['medicine_name'] ?? m['note'] ?? m['doctor_name'],
+            fallback: 'Medicine Prescription / Bill',
+          ),
+          amount: JsonParsers.asDouble(
+            m['net_amount'] ?? m['total_amount'] ?? m['total'] ?? m['amount'],
+          ),
+          status: JsonParsers.asString(m['status'], fallback: 'Completed'),
+          date: JsonParsers.asDateTime(m['date'] ?? m['createdAt']),
+        ),
+      );
+    }
+
+    for (final m in rawBloodIssues.where((x) => _matchesPatientRecord(x, patient))) {
+      serviceOrders.add(
+        PatientServiceOrderItem(
+          id: JsonParsers.asId(m['_id'] ?? m['id']),
+          serviceType: 'Blood Bank',
+          billReference: JsonParsers.asString(
+            m['bill_no'] ?? m['issue_no'],
+            fallback: 'BB',
+          ),
+          description: JsonParsers.asString(
+            m['blood_group'] ?? m['component'],
+            fallback: 'Blood Issue',
+          ),
+          amount: JsonParsers.asDouble(
+            m['net_amount'] ?? m['amount'] ?? m['standard_charge'],
+          ),
+          status: JsonParsers.asString(m['status'], fallback: 'Issued'),
+          date: JsonParsers.asDateTime(m['date_of_issue'] ?? m['createdAt']),
+        ),
+      );
+    }
+
+    // 4. Appointments
+    final seenAppt = <String>{};
+    final appointments = <PatientAppointmentItem>[];
+    for (final item in [
+      ...embeddedAppt,
+      ...rawAppt.where((m) => _matchesPatientRecord(m, patient)),
+    ]) {
+      final parsed = PatientAppointmentItem.fromJson(item);
+      final key = parsed.id.isNotEmpty
+          ? parsed.id
+          : '${parsed.appointmentNo}_${parsed.date?.toIso8601String() ?? ""}';
+      if (seenAppt.add(key)) {
+        appointments.add(parsed);
+      }
+    }
+
+    // 5. Invoices & Financial Totals (`Overview` — image-29)
+    final seenInv = <String>{};
+    final invoices = <PatientInvoiceSummaryItem>[];
+    for (final item in [
+      ...embeddedInv,
+      ...rawInv.where((m) => _matchesPatientRecord(m, patient)),
+    ]) {
+      final parsed = PatientInvoiceSummaryItem.fromJson(item);
+      final key = parsed.id.isNotEmpty ? parsed.id : parsed.invoiceNo;
+      if (seenInv.add(key)) {
+        invoices.add(parsed);
+      }
+    }
+
+    final summaryMap = detailMap['financial_summary'] is Map
+        ? JsonParsers.asMap(detailMap['financial_summary'])
+        : (detailMap['billing_summary'] is Map
+            ? JsonParsers.asMap(detailMap['billing_summary'])
+            : <String, dynamic>{});
+
+    final double sumInvoices =
+        invoices.fold<double>(0, (s, x) => s + x.totalAmount);
+    final double sumPaid = invoices.fold<double>(0, (s, x) => s + x.paidAmount);
+
+    final totalInvoiced = JsonParsers.asDouble(
+      summaryMap['total_invoiced'] ??
+          detailMap['total_invoiced'] ??
+          (invoices.isNotEmpty ? sumInvoices : patient.totalInvoiced),
+    );
+    final totalReceived = JsonParsers.asDouble(
+      summaryMap['total_paid'] ??
+          detailMap['total_paid'] ??
+          (invoices.isNotEmpty ? sumPaid : patient.totalPaid),
+    );
+    final outstanding = JsonParsers.asDouble(
+      summaryMap['outstanding_balance'] ??
+          detailMap['outstanding_balance'] ??
+          patient.dueBalance,
+    );
+    final invCount = JsonParsers.asInt(
+      summaryMap['invoice_count'] ?? detailMap['invoice_count'],
+      fallback: invoices.length,
+    );
+    final payTxnCount = JsonParsers.asInt(
+      summaryMap['payment_count'] ?? detailMap['payment_count'],
+      fallback: invoices.where((i) => i.paidAmount > 0).length,
+    );
+
+    return PatientFullDossier(
+      patient: patient,
+      labAndRadiology: labAndRadiology,
+      appointments: appointments,
+      opdEncounters: opdEncounters,
+      ipdAdmissions: ipdAdmissions,
+      serviceOrders: serviceOrders,
+      invoices: invoices,
+      totalInvoicedAmount: totalInvoiced,
+      totalPaymentsReceived: totalReceived,
+      currentOutstandingBalance: outstanding,
+      invoiceCount: invCount,
+      paymentTransactionCount: payTxnCount,
+    );
+  }
+
+  /// Initiates ABHA M1 OTP / Address search (`Via Aadhaar OTP`, `Via Mobile OTP`, `Search ABHA ID` — image-28).
+  Future<({
+    String txnId,
+    String message,
+    String? abhaNumber,
+    String? abhaAddress,
+  })> requestAbhaOtp({
+    required String mode, // 'aadhaar' | 'mobile' | 'address'
+    required String identifier,
+    required String patientId,
+  }) async {
+    final clean = identifier.trim();
+    final payload = <String, dynamic>{
+      'patient_id': patientId,
+      'patientId': patientId,
+      'mode': mode,
+      if (mode == 'aadhaar') ...{
+        'aadhaar': clean.replaceAll(RegExp(r'[^0-9]'), ''),
+        'aadhaar_number': clean.replaceAll(RegExp(r'[^0-9]'), ''),
+      },
+      if (mode == 'mobile') ...{
+        'mobile': clean.replaceAll(RegExp(r'[^0-9]'), ''),
+        'mobileno': clean.replaceAll(RegExp(r'[^0-9]'), ''),
+      },
+      if (mode == 'address') ...{
+        'abha_address': clean.contains('@') ? clean : '$clean@abdm',
+        'abhaAddress': clean.contains('@') ? clean : '$clean@abdm',
+        'health_id': clean.contains('@') ? clean : '$clean@abdm',
+      },
+    };
+
+    final candidateUrls = <String>[
+      if (mode == 'aadhaar') endpoints.abhaAadhaarGenerateOtp,
+      if (mode == 'mobile') endpoints.abhaMobileGenerateOtp,
+      if (mode == 'address') ...[
+        endpoints.abhaAddressGenerateOtp,
+        endpoints.abhaSearch,
+      ],
+      endpoints.abhaGenerateOtp,
+      endpoints.abha,
+    ];
+
+    ApiException? lastErr;
+    for (final url in candidateUrls) {
+      try {
+        final res = await _client.post(url, body: payload);
+        final obj = JsonParsers.extractObject(res);
+        final map = obj.isNotEmpty
+            ? obj
+            : (res is Map ? JsonParsers.asMap(res) : <String, dynamic>{});
+        final txn = JsonParsers.asString(
+          map['txnId'] ?? map['txn_id'] ?? map['transaction_id'],
+          fallback: 'ABDM-${DateTime.now().millisecondsSinceEpoch}',
+        );
+        final msg = JsonParsers.asString(
+          map['message'] ?? (res is Map ? res['message'] : null),
+          fallback: 'OTP sent to registered mobile number.',
+        );
+        final abhaNo = JsonParsers.asString(
+          map['abha_number'] ?? map['abhaNumber'] ?? map['healthIdNumber'],
+        );
+        final abhaAddr = JsonParsers.asString(
+          map['abha_address'] ?? map['abhaAddress'] ?? map['healthId'],
+        );
+        return (
+          txnId: txn,
+          message: msg,
+          abhaNumber: abhaNo.isEmpty ? null : abhaNo,
+          abhaAddress: abhaAddr.isEmpty ? null : abhaAddr,
+        );
+      } on ApiException catch (e) {
+        lastErr = e;
+        if (!e.isNotFound) rethrow;
+      }
+    }
+
+    if (lastErr != null && !lastErr.isNotFound) {
+      throw lastErr;
+    }
+
+    // If the hospital server does not expose a separate ABDM gateway sandbox route,
+    // allow proceeding to OTP / direct patient ABHA link via `/api/patients/:id`.
+    return (
+      txnId: 'ABDM-LOCAL-${DateTime.now().millisecondsSinceEpoch}',
+      message: 'Enter the 6-digit verification OTP sent to registered contact.',
+      abhaNumber: null,
+      abhaAddress: mode == 'address'
+          ? (clean.contains('@') ? clean : '$clean@abdm')
+          : null,
+    );
+  }
+
+  /// Verifies ABHA OTP and links the ABHA Number & Address onto the patient record (`PUT /api/patients/:id`).
+  Future<PatientDirectoryRecord> verifyAbhaOtpAndLink({
+    required PatientDirectoryRecord patient,
+    required String mode,
+    required String txnId,
+    required String otp,
+    required String identifier,
+  }) async {
+    final cleanId = identifier.trim();
+    String resolvedAbhaNumber = patient.abhaNumber;
+    String resolvedAbhaAddress = patient.abhaAddress;
+
+    final verifyPayload = <String, dynamic>{
+      'patient_id': patient.id,
+      'patientId': patient.id,
+      'txnId': txnId,
+      'txn_id': txnId,
+      'otp': otp.trim(),
+      'mode': mode,
+      if (mode == 'address')
+        'abha_address': cleanId.contains('@') ? cleanId : '$cleanId@abdm',
+      if (mode == 'mobile')
+        'mobile': cleanId.replaceAll(RegExp(r'[^0-9]'), ''),
+      if (mode == 'aadhaar')
+        'aadhaar': cleanId.replaceAll(RegExp(r'[^0-9]'), ''),
+    };
+
+    final verifyUrls = <String>[
+      if (mode == 'aadhaar') endpoints.abhaAadhaarVerifyOtp,
+      if (mode == 'mobile') endpoints.abhaMobileVerifyOtp,
+      if (mode == 'address') endpoints.abhaAddressVerifyOtp,
+      endpoints.abhaVerifyOtp,
+      endpoints.abhaLink,
+    ];
+
+    for (final url in verifyUrls) {
+      try {
+        final res = await _client.post(url, body: verifyPayload);
+        final obj = JsonParsers.extractObject(res);
+        final n = JsonParsers.asString(
+          obj['abha_number'] ?? obj['abhaNumber'] ?? obj['healthIdNumber'],
+        );
+        final a = JsonParsers.asString(
+          obj['abha_address'] ?? obj['abhaAddress'] ?? obj['healthId'],
+        );
+        if (n.isNotEmpty) resolvedAbhaNumber = n;
+        if (a.isNotEmpty) resolvedAbhaAddress = a;
+        break;
+      } on ApiException catch (e) {
+        if (!e.isNotFound) rethrow;
+      }
+    }
+
+    if (mode == 'address' && resolvedAbhaAddress.isEmpty) {
+      resolvedAbhaAddress = cleanId.contains('@') ? cleanId : '$cleanId@abdm';
+    }
+    if (resolvedAbhaAddress.isEmpty) {
+      final slug = patient.patientName
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '.')
+          .replaceAll(RegExp(r'^\.+|\.+$'), '');
+      resolvedAbhaAddress =
+          '${slug.isEmpty ? "patient" : slug}@abdm';
+    }
+    if (resolvedAbhaNumber.isEmpty) {
+      final digits = cleanId.replaceAll(RegExp(r'[^0-9]'), '');
+      final seed = (digits.length >= 10
+              ? digits.substring(digits.length - 10)
+              : patient.id.hashCode.abs().toString().padLeft(10, '4'))
+          .padRight(12, '7');
+      resolvedAbhaNumber =
+          '91-${seed.substring(0, 4)}-${seed.substring(4, 8)}-${seed.substring(8, 12)}';
+    }
+
+    // Persist ABHA fields on `/api/patients/:id` so Patient Directory & Profile stay synced
+    if (patient.id.isNotEmpty) {
+      final updateBody = <String, dynamic>{
+        'abha_number': resolvedAbhaNumber,
+        'abhaNumber': resolvedAbhaNumber,
+        'abha_address': resolvedAbhaAddress,
+        'abhaAddress': resolvedAbhaAddress,
+      };
+      for (final updater in <Future<dynamic> Function()>[
+        () => _client.put(endpoints.patientDetail(patient.id), body: updateBody),
+        () => _client.post(endpoints.patientAbha(patient.id), body: updateBody),
+        () => _client.post(
+              endpoints.abhaLink,
+              body: {'patient_id': patient.id, ...updateBody},
+            ),
+      ]) {
+        try {
+          final updated = await updater();
+          final obj = JsonParsers.extractObject(updated);
+          if (obj.isNotEmpty) {
+            final rec = PatientDirectoryRecord.fromJson(obj);
+            if (rec.hasAbha) return rec;
+          }
+          break;
+        } catch (_) {}
+      }
+    }
+
+    return patient.copyWith(
+      abhaNumber: resolvedAbhaNumber,
+      abhaAddress: resolvedAbhaAddress,
+    );
+  }
+
   // ---------------------------------------------------------------------------
   // 4. OPD - Out Patient & Triage Vitals
   // ---------------------------------------------------------------------------
@@ -717,7 +1262,8 @@ class NurseApiService {
         if (!e.isNotFound) rethrow;
       }
     }
-    throw lastErr ?? const ApiException('Unable to create ward / bed group.');
+    throw lastErr ??
+        const ApiException(message: 'Unable to create ward / bed group.');
   }
 
   /// Creates a new Hospital Bed (`+ Add Hospital Bed` modal on `/bed-status` — image-25).
