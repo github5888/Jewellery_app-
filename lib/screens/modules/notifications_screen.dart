@@ -5,7 +5,7 @@ import '../../core/utils/formatters.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 
-/// Section 8: Real-Time Socket.IO Live Clinical Alerts Feed
+/// Real-Time Socket.IO Live Clinical Alerts + `GET https://hospital.hrpocket.in/api/notifications`
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -26,17 +26,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Widget build(BuildContext context) {
     final controller = NursePortalScope.of(context);
     final liveAlerts = controller.liveAlerts;
+    final serverAlerts = controller.serverNotifications;
     final dashActivities = controller.dashboard?.recentActivity ?? const [];
 
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(title: const Text('Live Ward Alerts')),
-      body: liveAlerts.isEmpty && dashActivities.isEmpty
+      body: liveAlerts.isEmpty && serverAlerts.isEmpty && dashActivities.isEmpty
           ? ClinicalEmptyState(
               icon: Icons.notifications_none_rounded,
               title: 'No Live Ward Alerts Yet',
               subtitle: controller.socketConnected
-                  ? 'Socket.IO is connected. Real-time admissions, vitals, and MAR updates will stream here.'
+                  ? 'Socket.IO & /api/notifications connected. Real-time admissions, vitals, and MAR updates will stream here.'
                   : 'Real-time clinical updates from the ward will appear here.',
             )
           : ListView(
@@ -102,6 +103,63 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                                 fontSize: 11.5,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                if (serverAlerts.isNotEmpty) ...[
+                  const Text(
+                    'Hospital Notifications (/api/notifications)',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 15.5,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...serverAlerts.map(
+                    (n) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SoftSurfaceCard(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    n.title,
+                                    style: const TextStyle(
+                                      color: AppColors.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  AppFormatters.timeAgo(n.createdAt),
+                                  style: const TextStyle(
+                                    color: AppColors.textMuted,
+                                    fontSize: 11.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            if (n.message.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                n.message,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12.5,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

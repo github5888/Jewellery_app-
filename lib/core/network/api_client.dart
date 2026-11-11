@@ -58,18 +58,39 @@ class ApiClient {
   }
 
   Uri _buildUri(
-    String path, {
+    String pathOrFullUrl, {
     Map<String, String>? queryParameters,
     String? overrideBaseUrl,
   }) {
     final effectiveBase =
         overrideBaseUrl ?? AppConfig.effectiveTransportBaseUrl(_baseUrl);
-    final cleanPath = path.startsWith('/') ? path : '/$path';
-    final uri = Uri.parse('$effectiveBase$cleanPath');
+    Uri uri;
+    if (pathOrFullUrl.startsWith('http://') ||
+        pathOrFullUrl.startsWith('https://')) {
+      final parsed = Uri.parse(pathOrFullUrl);
+      if (overrideBaseUrl != null ||
+          (kIsWeb &&
+              AppConfig.webProxyActive &&
+              !AppConfig.isLoopbackUrl(pathOrFullUrl))) {
+        final proxyParsed = Uri.parse(effectiveBase);
+        uri = parsed.replace(
+          scheme: proxyParsed.scheme,
+          host: proxyParsed.host,
+          port: proxyParsed.hasPort ? proxyParsed.port : null,
+        );
+      } else {
+        uri = parsed;
+      }
+    } else {
+      final cleanPath =
+          pathOrFullUrl.startsWith('/') ? pathOrFullUrl : '/$pathOrFullUrl';
+      uri = Uri.parse('$effectiveBase$cleanPath');
+    }
+
     if (queryParameters == null || queryParameters.isEmpty) {
       return uri;
     }
-    final filtered = <String, String>{};
+    final filtered = <String, String>{...uri.queryParameters};
     queryParameters.forEach((key, val) {
       if (val.trim().isNotEmpty) {
         filtered[key] = val.trim();
@@ -312,6 +333,54 @@ class ApiClient {
       return (bytes: response.bodyBytes, contentType: contentType);
     } on TimeoutException {
       throw const ApiException(message: 'Report download timed out.');
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw _formatNetworkError(e);
+    }
+  }
+
+  /// Uploads a clinical attachment (e.g. wound/rash photo on Nurse Progress Notes)
+  /// to `POST https://hospital.hrpocket.in/api/uploads`.
+  Future<String> uploadMultipartBytes({
+    required String urlOrPath,
+    required Uint8List bytes,
+    required String filename,
+    String fieldName = 'file',
+    Duration timeout = const Duration(seconds: 30),
+  }) async {
+    final uri = _buildUri(urlOrPath);
+    final request = http.MultipartRequest('POST', uri);
+    if (hasToken) {
+      request.headers['Authorization'] = 'Bearer $_authToken';
+    }
+    if (kIsWeb &&
+        AppConfig.webProxyActive &&
+        !AppConfig.isLoopbackUrl(_baseUrl)) {
+      request.headers['X-Hospital-Target'] = _baseUrl;
+    }
+    request.files.add(
+      http.MultipartFile.fromBytes(fieldName, bytes, filename: filename),
+    );
+    try {
+      final streamed = await _http.send(request).timeout(timeout);
+      final response = await http.Response.fromStream(streamed);
+      final decoded = _decodeResponse(response, triggerAuthCallback: true);
+      if (decoded is Map) {
+        final data = decoded['data'];
+        final candidate = decoded['url'] ??
+            decoded['path'] ??
+            decoded['file'] ??
+            (data is Map ? (data['url'] ?? data['path'] ?? data['file']) : data);
+        if (candidate != null && candidate.toString().trim().isNotEmpty) {
+          return candidate.toString().trim();
+        }
+      }
+      throw const ApiException(
+        message: 'Upload completed without returning an attachment path.',
+      );
+    } on TimeoutException {
+      throw const ApiException(message: 'Attachment upload timed out.');
     } on ApiException {
       rethrow;
     } catch (e) {

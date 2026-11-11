@@ -8,13 +8,105 @@ import '../../widgets/server_config_sheet.dart';
 import '../../widgets/status_badge.dart';
 import '../beds/bed_status_screen.dart';
 import '../modules/annual_calendar_screen.dart';
+import '../modules/api_connections_screen.dart';
+import '../modules/appointments_screen.dart';
 import '../modules/blood_bank_screen.dart';
+import '../modules/pharmacy_inventory_screen.dart';
+import '../modules/staff_directory_screen.dart';
 import '../opd/opd_triage_screen.dart';
 import '../reports/reports_screen.dart';
 import '../roster/duty_roster_screen.dart';
 
 class NurseProfileScreen extends StatelessWidget {
   const NurseProfileScreen({super.key});
+
+  Future<void> _showChangePasswordDialog(BuildContext context) async {
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) {
+        bool saving = false;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              title: const Text('Change Nurse Password'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: currentCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Current Password',
+                      prefixIcon: Icon(Icons.lock_outline_rounded),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: newCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'New Password',
+                      prefixIcon: Icon(Icons.vpn_key_outlined),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: saving ? null : () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(120, 42),
+                  ),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (currentCtrl.text.trim().isEmpty ||
+                              newCtrl.text.trim().isEmpty) {
+                            return;
+                          }
+                          setDialogState(() => saving = true);
+                          try {
+                            await NursePortalScope.read(context)
+                                .api
+                                .changePassword(
+                                  currentPassword: currentCtrl.text,
+                                  newPassword: newCtrl.text,
+                                );
+                            if (!ctx.mounted) return;
+                            Navigator.of(ctx).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content:
+                                    Text('Password updated successfully.'),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          } catch (e) {
+                            setDialogState(() => saving = false);
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Could not change password: $e'),
+                                backgroundColor: AppColors.danger,
+                              ),
+                            );
+                          }
+                        },
+                  child: Text(saving ? 'Saving...' : 'Update'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +120,17 @@ class NurseProfileScreen extends StatelessWidget {
         automaticallyImplyLeading: false,
         title: const Text('My Nurse Profile'),
         actions: [
+          IconButton(
+            tooltip: 'Full Live API Links',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const ApiConnectionsScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.hub_rounded, color: AppColors.primary),
+          ),
           IconButton(
             tooltip: 'Server Settings',
             onPressed: () => showServerConfigSheet(context),
@@ -125,6 +228,18 @@ class NurseProfileScreen extends StatelessWidget {
             child: Column(
               children: [
                 _MenuRow(
+                  icon: Icons.hub_rounded,
+                  title: 'Full Live API Links & Status',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ApiConnectionsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
                   icon: Icons.schedule_rounded,
                   title: 'My Duty Roster & Shifts',
                   onTap: () {
@@ -155,6 +270,42 @@ class NurseProfileScreen extends StatelessWidget {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => const OpdTriageScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.event_available_rounded,
+                  title: 'Hospital Appointments',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AppointmentsScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.badge_rounded,
+                  title: 'Doctors & Staff Directory',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const StaffDirectoryScreen(),
+                      ),
+                    );
+                  },
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.medication_liquid_rounded,
+                  title: 'Pharmacy & Ward Supplies',
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PharmacyInventoryScreen(),
                       ),
                     );
                   },
@@ -194,6 +345,12 @@ class NurseProfileScreen extends StatelessWidget {
                       ),
                     );
                   },
+                ),
+                const Divider(indent: 54),
+                _MenuRow(
+                  icon: Icons.lock_reset_rounded,
+                  title: 'Change Password',
+                  onTap: () => _showChangePasswordDialog(context),
                 ),
                 const Divider(indent: 54),
                 _MenuRow(

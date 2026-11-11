@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../core/config/api_endpoints.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
 import '../core/utils/json_parsers.dart';
@@ -19,6 +20,7 @@ class NurseApiService {
   const NurseApiService(this._client);
 
   ApiClient get client => _client;
+  ApiEndpoints get endpoints => ApiEndpoints(_client.baseUrl);
 
   // ---------------------------------------------------------------------------
   // 0. Server Health & Public Hospital Branding
@@ -27,7 +29,7 @@ class NurseApiService {
   Future<bool> checkHealth() async {
     try {
       final res = await _client.get(
-        '/api/health',
+        endpoints.health,
         includeAuth: false,
         timeout: const Duration(seconds: 8),
       );
@@ -39,10 +41,10 @@ class NurseApiService {
   }
 
   Future<HospitalInfo?> fetchPublicHospitalInfo() async {
-    for (final endpoint in const ['/api/settings/public', '/api/settings']) {
+    for (final url in [endpoints.settingsPublic, endpoints.settings]) {
       try {
         final res = await _client.get(
-          endpoint,
+          url,
           includeAuth: _client.hasToken,
           timeout: const Duration(seconds: 8),
         );
@@ -50,9 +52,7 @@ class NurseApiService {
         if (obj.isNotEmpty) {
           return HospitalInfo.fromJson(obj);
         }
-      } catch (_) {
-        // Public settings is optional pre-login
-      }
+      } catch (_) {}
     }
     return null;
   }
@@ -66,7 +66,7 @@ class NurseApiService {
     required String password,
   }) async {
     final res = await _client.post(
-      '/api/auth/login',
+      endpoints.authLogin,
       includeAuth: false,
       body: <String, dynamic>{
         'username': username.trim(),
@@ -89,9 +89,33 @@ class NurseApiService {
   }
 
   Future<NurseUser> fetchMe() async {
-    final res = await _client.get('/api/auth/me');
+    final res = await _client.get(endpoints.authMe);
     final obj = JsonParsers.extractObject(res);
     return NurseUser.fromJson(obj);
+  }
+
+  Future<void> logoutServer() async {
+    try {
+      await _client.post(
+        endpoints.authLogout,
+        timeout: const Duration(seconds: 6),
+      );
+    } catch (_) {}
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _client.put(
+      endpoints.authChangePassword,
+      body: <String, dynamic>{
+        'currentPassword': currentPassword,
+        'old_password': currentPassword,
+        'newPassword': newPassword,
+        'new_password': newPassword,
+      },
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -99,7 +123,7 @@ class NurseApiService {
   // ---------------------------------------------------------------------------
 
   Future<NurseDashboardData> fetchDashboard() async {
-    final res = await _client.get('/api/dashboard');
+    final res = await _client.get(endpoints.dashboard);
     return NurseDashboardData.fromJson(JsonParsers.asMap(res));
   }
 
@@ -114,13 +138,13 @@ class NurseApiService {
     if (dischargeStatus.isNotEmpty && dischargeStatus != 'all') {
       query['discharge_status'] = dischargeStatus;
     }
-    final res = await _client.get('/api/ipd', queryParameters: query);
+    final res = await _client.get(endpoints.ipdList, queryParameters: query);
     final list = JsonParsers.extractList(res);
     return list.map(IpdAdmission.fromJson).toList();
   }
 
   Future<IpdAdmission> fetchIpdPatientDetail(String ipdId) async {
-    final res = await _client.get('/api/ipd/$ipdId');
+    final res = await _client.get(endpoints.ipdDetail(ipdId));
     return IpdAdmission.fromJson(JsonParsers.asMap(res));
   }
 
@@ -158,7 +182,18 @@ class NurseApiService {
         'recorded_by_id': recordedById.trim(),
       if (notes.trim().isNotEmpty) 'notes': notes.trim(),
     };
-    await _client.post('/api/ipd/$ipdId/vitals', body: payload);
+    await _client.post(endpoints.ipdVitals(ipdId), body: payload);
+  }
+
+  Future<String> uploadAttachmentBytes({
+    required Uint8List bytes,
+    required String filename,
+  }) {
+    return _client.uploadMultipartBytes(
+      urlOrPath: endpoints.uploads,
+      bytes: bytes,
+      filename: filename,
+    );
   }
 
   Future<void> addNurseProgressNote({
@@ -178,13 +213,13 @@ class NurseApiService {
       if (attachment != null && attachment.trim().isNotEmpty)
         'attachment': attachment.trim(),
     };
-    await _client.post('/api/ipd/$ipdId/nurse-notes', body: payload);
+    await _client.post(endpoints.ipdNurseNotes(ipdId), body: payload);
   }
 
   Future<void> administerMedication({
     required String ipdId,
     required String prescriptionId,
-    required String status, // Given | Missed | Refused | Held
+    required String status,
     String remarks = '',
     String? administeredBy,
     String? administeredById,
@@ -201,7 +236,7 @@ class NurseApiService {
       if (remarks.trim().isNotEmpty) 'remarks': remarks.trim(),
     };
     await _client.post(
-      '/api/ipd/$ipdId/prescriptions/$prescriptionId/administer',
+      endpoints.ipdAdministerPrescription(ipdId, prescriptionId),
       body: payload,
     );
   }
@@ -212,7 +247,7 @@ class NurseApiService {
     required String transferReason,
   }) async {
     await _client.post(
-      '/api/ipd/$ipdId/transfer-bed',
+      endpoints.ipdTransferBed(ipdId),
       body: <String, dynamic>{
         'bed_id': bedId.trim(),
         'transfer_reason': transferReason.trim(),
@@ -225,7 +260,7 @@ class NurseApiService {
     required DischargeChecklist checklist,
   }) async {
     await _client.put(
-      '/api/ipd/$ipdId/discharge-checklist',
+      endpoints.ipdDischargeChecklist(ipdId),
       body: checklist.toJson(),
     );
   }
@@ -242,7 +277,7 @@ class NurseApiService {
     DateTime? date,
   }) async {
     await _client.post(
-      '/api/ipd/$ipdId/charges',
+      endpoints.ipdCharges(ipdId),
       body: <String, dynamic>{
         'charge_name': chargeName.trim(),
         'charge_type': chargeType.trim(),
@@ -266,12 +301,12 @@ class NurseApiService {
     if (isOccupied != null) {
       query['is_occupied'] = isOccupied.toString();
     }
-    final res = await _client.get('/api/beds', queryParameters: query);
+    final res = await _client.get(endpoints.beds, queryParameters: query);
     return JsonParsers.extractList(res).map(HospitalBed.fromJson).toList();
   }
 
   Future<List<WardBedGroup>> fetchBedGroups() async {
-    final res = await _client.get('/api/beds/groups');
+    final res = await _client.get(endpoints.bedGroups);
     return JsonParsers.extractList(res).map(WardBedGroup.fromJson).toList();
   }
 
@@ -280,8 +315,13 @@ class NurseApiService {
   // ---------------------------------------------------------------------------
 
   Future<List<OpdVisitRecord>> fetchOpdQueue() async {
-    final res = await _client.get('/api/opd');
+    final res = await _client.get(endpoints.opdList);
     return JsonParsers.extractList(res).map(OpdVisitRecord.fromJson).toList();
+  }
+
+  Future<OpdVisitRecord> fetchOpdDetail(String opdId) async {
+    final res = await _client.get(endpoints.opdDetail(opdId));
+    return OpdVisitRecord.fromJson(JsonParsers.extractObject(res));
   }
 
   Future<void> recordOpdTriageVitals({
@@ -314,12 +354,11 @@ class NurseApiService {
         'recorded_by_id': recordedById.trim(),
       if (notes.trim().isNotEmpty) 'notes': notes.trim(),
     };
-    await _client.post('/api/opd/$opdId/vitals', body: payload);
+    await _client.post(endpoints.opdVitals(opdId), body: payload);
   }
 
   // ---------------------------------------------------------------------------
   // 7. Nurse Duty Roster & Shifts APIs
-  // (`server.ts` mounts `/api/dutyroster`; spec documents `/api/duty-rosters/assignments`)
   // ---------------------------------------------------------------------------
 
   Future<List<DutyShiftAssignment>> fetchDutyRoster({String? staffId}) async {
@@ -327,25 +366,22 @@ class NurseApiService {
       if (staffId != null && staffId.trim().isNotEmpty)
         'staff_id': staffId.trim(),
     };
-    final candidatePaths = <String>[
-      '/api/dutyroster/assignments',
-      '/api/dutyroster',
-      '/api/duty-rosters/assignments',
+    final candidateUrls = <String>[
+      endpoints.dutyRosterAssignments,
+      endpoints.dutyRoster,
+      endpoints.dutyRostersAssignmentsLegacy,
     ];
 
     ApiException? lastError;
-    for (final path in candidatePaths) {
+    for (final url in candidateUrls) {
       try {
-        final res = await _client.get(path, queryParameters: query);
-        final list = JsonParsers.extractList(res)
+        final res = await _client.get(url, queryParameters: query);
+        return JsonParsers.extractList(res)
             .map(DutyShiftAssignment.fromJson)
             .toList();
-        return list;
       } on ApiException catch (e) {
         lastError = e;
-        if (!e.isNotFound) {
-          rethrow;
-        }
+        if (!e.isNotFound) rethrow;
       }
     }
     if (lastError != null) throw lastError;
@@ -353,20 +389,25 @@ class NurseApiService {
   }
 
   // ---------------------------------------------------------------------------
-  // 8. Patient Directory, Reports, Blood Bank, Holidays, Charges
+  // 8. Patient Directory, Reports, Appointments, Staff, Pharmacy, Inventory, etc.
   // ---------------------------------------------------------------------------
 
   Future<List<PatientDirectoryRecord>> fetchPatientDirectory() async {
-    final res = await _client.get('/api/patients');
+    final res = await _client.get(endpoints.patients);
     return JsonParsers.extractList(res)
         .map(PatientDirectoryRecord.fromJson)
         .toList();
   }
 
+  Future<PatientDirectoryRecord> fetchPatientDetail(String patientId) async {
+    final res = await _client.get(endpoints.patientDetail(patientId));
+    return PatientDirectoryRecord.fromJson(JsonParsers.extractObject(res));
+  }
+
   Future<List<ClinicalReportRecord>> fetchPathologyReports() async {
-    for (final path in const ['/api/pathology', '/api/pathology/bills']) {
+    for (final url in [endpoints.pathology, endpoints.pathologyBills]) {
       try {
-        final res = await _client.get(path);
+        final res = await _client.get(url);
         final rawList = JsonParsers.extractList(res);
         return rawList
             .expand(
@@ -384,9 +425,9 @@ class NurseApiService {
   }
 
   Future<List<ClinicalReportRecord>> fetchRadiologyReports() async {
-    for (final path in const ['/api/radiology', '/api/radiology/bills']) {
+    for (final url in [endpoints.radiology, endpoints.radiologyBills]) {
       try {
-        final res = await _client.get(path);
+        final res = await _client.get(url);
         final rawList = JsonParsers.extractList(res);
         return rawList
             .expand(
@@ -409,14 +450,74 @@ class NurseApiService {
     return _client.downloadAuthenticatedBytes(reportPath);
   }
 
-  Future<List<BloodBankGroupItem>> fetchBloodBank() async {
-    for (final path in const [
-      '/api/blood-bank',
-      '/api/bloodbank',
-      '/api/blood-bank/status',
-    ]) {
+  Future<List<HospitalAppointmentItem>> fetchAppointments() async {
+    try {
+      final res = await _client.get(endpoints.appointments);
+      return JsonParsers.extractList(res)
+          .map(HospitalAppointmentItem.fromJson)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  Future<List<StaffDirectoryMember>> fetchStaffDirectory() async {
+    final res = await _client.get(endpoints.staff);
+    return JsonParsers.extractList(res)
+        .map(StaffDirectoryMember.fromJson)
+        .toList();
+  }
+
+  Future<List<PharmacyMedicineItem>> fetchPharmacyStock() async {
+    for (final url in [endpoints.pharmacyMedicines, endpoints.pharmacy]) {
       try {
-        final res = await _client.get(path);
+        final res = await _client.get(url);
+        return JsonParsers.extractList(res)
+            .map(PharmacyMedicineItem.fromJson)
+            .toList();
+      } on ApiException catch (e) {
+        if (!e.isNotFound) rethrow;
+      }
+    }
+    return const [];
+  }
+
+  Future<List<InventoryStockItem>> fetchWardInventory() async {
+    for (final url in [endpoints.inventory, endpoints.itemStock]) {
+      try {
+        final res = await _client.get(url);
+        return JsonParsers.extractList(res)
+            .map(InventoryStockItem.fromJson)
+            .toList();
+      } on ApiException catch (e) {
+        if (!e.isNotFound) rethrow;
+      }
+    }
+    return const [];
+  }
+
+  Future<List<ServerNotificationItem>> fetchNotifications() async {
+    for (final url in [endpoints.notifications, endpoints.messaging]) {
+      try {
+        final res = await _client.get(url);
+        return JsonParsers.extractList(res)
+            .map(ServerNotificationItem.fromJson)
+            .toList();
+      } catch (_) {}
+    }
+    return const [];
+  }
+
+  Future<void> markNotificationRead(String notificationId) async {
+    try {
+      await _client.put(endpoints.notificationRead(notificationId));
+    } catch (_) {}
+  }
+
+  Future<List<BloodBankGroupItem>> fetchBloodBank() async {
+    for (final url in [endpoints.bloodBank, endpoints.bloodBankAlt]) {
+      try {
+        final res = await _client.get(url);
         return JsonParsers.extractList(res)
             .map(BloodBankGroupItem.fromJson)
             .toList();
@@ -428,9 +529,9 @@ class NurseApiService {
   }
 
   Future<List<HospitalHolidayItem>> fetchHolidays() async {
-    for (final path in const ['/api/holidays', '/api/holiday']) {
+    for (final url in [endpoints.holidays, endpoints.holidayAlt]) {
       try {
-        final res = await _client.get(path);
+        final res = await _client.get(url);
         return JsonParsers.extractList(res)
             .map(HospitalHolidayItem.fromJson)
             .toList();
@@ -443,10 +544,34 @@ class NurseApiService {
 
   Future<List<ChargeMasterItem>> fetchChargeMaster() async {
     try {
-      final res = await _client.get('/api/charges');
-      return JsonParsers.extractList(res).map(ChargeMasterItem.fromJson).toList();
+      final res = await _client.get(endpoints.charges);
+      return JsonParsers.extractList(res)
+          .map(ChargeMasterItem.fromJson)
+          .toList();
     } catch (_) {
       return const [];
+    }
+  }
+
+  /// Live diagnostic probe for the API Connections Status screen.
+  Future<({bool ok, String detail})> probeEndpoint(String fullUrl) async {
+    try {
+      final res = await _client.get(
+        fullUrl,
+        timeout: const Duration(seconds: 10),
+      );
+      final list = JsonParsers.extractList(res);
+      if (list.isNotEmpty) {
+        return (ok: true, detail: '200 OK (${list.length} records)');
+      }
+      return (ok: true, detail: '200 OK (Connected)');
+    } on ApiException catch (e) {
+      if (e.isForbidden) {
+        return (ok: true, detail: '403 RBAC Restricted for Nurse Role');
+      }
+      return (ok: false, detail: e.message);
+    } catch (e) {
+      return (ok: false, detail: e.toString());
     }
   }
 }

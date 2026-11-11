@@ -62,8 +62,48 @@ flutter build apk --release
 
 ### Server Endpoint Configuration
 - **Default Server**: `https://hospital.hrpocket.in`
-- Tap the **Server Endpoint** icon at the top-right of the **Login** or **Profile** screen to switch between:
-  - Production: `https://hospital.hrpocket.in`
-  - Android Emulator local backend: `http://10.0.2.2:5000`
-  - Custom LAN / Staging server URL
-- Note for **Flutter Web** (`flutter run -d chrome`): Backend `server.ts` enforces CORS via `CORS_ORIGINS` (`http://localhost:5173` by default). Native Android/iOS builds send no browser `Origin` header and connect directly to `https://hospital.hrpocket.in` out of the box; if running in Chrome against a remote server, include your Chrome dev port in backend `CORS_ORIGINS`.
+- Centralized full-URL registry: [`lib/core/config/api_endpoints.dart`](lib/core/config/api_endpoints.dart) + live in-app endpoint verifier screen (**Profile → Full Live API Links & Status**).
+
+---
+
+## Complete Linked Full API Endpoints (`https://hospital.hrpocket.in`)
+
+| Module | Method | Full Live API URL |
+|---|---|---|
+| Server Health | `GET` | `https://hospital.hrpocket.in/api/health` |
+| Hospital Branding | `GET` | `https://hospital.hrpocket.in/api/settings/public` |
+| Nurse Login | `POST` | `https://hospital.hrpocket.in/api/auth/login` |
+| Nurse Profile & Role | `GET` | `https://hospital.hrpocket.in/api/auth/me` |
+| Change Password | `PUT` | `https://hospital.hrpocket.in/api/auth/change-password` |
+| Nurse Logout | `POST` | `https://hospital.hrpocket.in/api/auth/logout` |
+| Nurse Home Census Dashboard | `GET` | `https://hospital.hrpocket.in/api/dashboard` |
+| Admitted IPD Ward Patients | `GET` | `https://hospital.hrpocket.in/api/ipd?discharge_status=admitted` |
+| Bedside Digital Patient Chart | `GET` | `https://hospital.hrpocket.in/api/ipd/:id` |
+| Record IPD Bedside Vitals | `POST` | `https://hospital.hrpocket.in/api/ipd/:id/vitals` |
+| Daily Shift Nurse Progress Note | `POST` | `https://hospital.hrpocket.in/api/ipd/:id/nurse-notes` |
+| Medication Administration (MAR) | `POST` | `https://hospital.hrpocket.in/api/ipd/:id/prescriptions/:prescriptionId/administer` |
+| Patient Bed Transfer / Shift | `POST` | `https://hospital.hrpocket.in/api/ipd/:id/transfer-bed` |
+| Pre-Discharge Nursing Checklist | `PUT` | `https://hospital.hrpocket.in/api/ipd/:id/discharge-checklist` |
+| Nursing Procedures / Charge Log | `POST` | `https://hospital.hrpocket.in/api/ipd/:id/charges` |
+| All Hospital Beds | `GET` | `https://hospital.hrpocket.in/api/beds` |
+| Vacant Beds Filter | `GET` | `https://hospital.hrpocket.in/api/beds?is_occupied=false` |
+| Wards / Bed Groups | `GET` | `https://hospital.hrpocket.in/api/beds/groups` |
+| OPD Waiting Triage Queue | `GET` | `https://hospital.hrpocket.in/api/opd` |
+| OPD Consultation Detail | `GET` | `https://hospital.hrpocket.in/api/opd/:id` |
+| Record OPD Triage Vitals | `POST` | `https://hospital.hrpocket.in/api/opd/:id/vitals` |
+| Nurse Duty Roster & Shifts | `GET` | `https://hospital.hrpocket.in/api/dutyroster` (`/assignments`) |
+| Patient Master Directory | `GET` | `https://hospital.hrpocket.in/api/patients` |
+| Pathology Lab Reports | `GET` | `https://hospital.hrpocket.in/api/pathology` |
+| Radiology Scan Reports | `GET` | `https://hospital.hrpocket.in/api/radiology` |
+| Protected Lab/Radiology Files | `GET` | `https://hospital.hrpocket.in/api/files/pathology_report/:file` & `/api/files/radiology_report/:file` |
+| Appointments Schedule | `GET` | `https://hospital.hrpocket.in/api/appointments` |
+| Doctors & Staff Directory | `GET` | `https://hospital.hrpocket.in/api/staff` |
+| Pharmacy Medicines Stock | `GET` | `https://hospital.hrpocket.in/api/pharmacy/medicines` (`/api/pharmacy`) |
+| Ward Consumables Inventory | `GET` | `https://hospital.hrpocket.in/api/inventory` (`/api/itemstock`) |
+| Blood Bank Status | `GET` | `https://hospital.hrpocket.in/api/blood-bank` |
+| Annual Holiday Calendar | `GET` | `https://hospital.hrpocket.in/api/holidays` |
+| Hospital Charge Master | `GET` | `https://hospital.hrpocket.in/api/charges` |
+| Notifications & Ward Alerts | `GET` / `PUT` | `https://hospital.hrpocket.in/api/notifications` (`/:id/read`) |
+| Clinical Attachment Upload | `POST` | `https://hospital.hrpocket.in/api/uploads` |
+| Real-Time Ward Socket.IO | `WS` | `wss://hospital.hrpocket.in/socket.io/` (`join_hospital`, `ipd:new_admission`, `ipd:vitals_recorded`, `ipd:medication_administered`) |
+

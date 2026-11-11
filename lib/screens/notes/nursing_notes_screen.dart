@@ -23,6 +23,7 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
   String? _selectedIpdId;
   final _noteCtrl = TextEditingController();
   final _commentCtrl = TextEditingController();
+  final _attachmentCtrl = TextEditingController();
   bool _submitting = false;
 
   @override
@@ -35,6 +36,7 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
   void dispose() {
     _noteCtrl.dispose();
     _commentCtrl.dispose();
+    _attachmentCtrl.dispose();
     super.dispose();
   }
 
@@ -68,9 +70,11 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
         note: _noteCtrl.text.trim(),
         comment: _commentCtrl.text.trim(),
         nurseName: controller.currentUser?.fullName,
+        attachment: _attachmentCtrl.text.trim(),
       );
       _noteCtrl.clear();
       _commentCtrl.clear();
+      _attachmentCtrl.clear();
       await controller.refreshWorkspace();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -192,6 +196,15 @@ class _NursingNotesScreenState extends State<NursingNotesScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Shift Handover Comment / Remarks',
                       hintText: 'e.g. Patient slept well during night shift.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _attachmentCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Optional Attachment URL / Chart Reference',
+                      hintText: 'e.g. /uploads/chart-photo.jpg',
+                      prefixIcon: Icon(Icons.attach_file_rounded),
                     ),
                   ),
                   const SizedBox(height: 16),

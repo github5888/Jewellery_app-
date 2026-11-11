@@ -10,8 +10,12 @@ import '../../widgets/status_badge.dart';
 import '../beds/bed_status_screen.dart';
 import '../medications/medications_mar_screen.dart';
 import '../modules/annual_calendar_screen.dart';
+import '../modules/api_connections_screen.dart';
+import '../modules/appointments_screen.dart';
 import '../modules/blood_bank_screen.dart';
 import '../modules/notifications_screen.dart';
+import '../modules/pharmacy_inventory_screen.dart';
+import '../modules/staff_directory_screen.dart';
 import '../notes/nursing_notes_screen.dart';
 import '../opd/opd_triage_screen.dart';
 import '../patients/ipd_patient_detail_screen.dart';
@@ -27,13 +31,14 @@ class NurseDashboardScreen extends StatelessWidget {
   void _openMoreClinicalHub(BuildContext context) {
     showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetCtx) {
         return SafeArea(
-          child: Padding(
+          child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 22),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -152,6 +157,62 @@ class NurseDashboardScreen extends StatelessWidget {
                         Navigator.of(context).push(
                           MaterialPageRoute(
                             builder: (_) => const AnnualCalendarScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _QuickActionTile(
+                      icon: Icons.event_available_rounded,
+                      iconBg: AppColors.infoSoft,
+                      iconColor: AppColors.primary,
+                      label: 'Appointments',
+                      onTap: () {
+                        Navigator.of(sheetCtx).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const AppointmentsScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _QuickActionTile(
+                      icon: Icons.badge_rounded,
+                      iconBg: AppColors.tealSoft,
+                      iconColor: AppColors.teal,
+                      label: 'Staff Dir',
+                      onTap: () {
+                        Navigator.of(sheetCtx).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const StaffDirectoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _QuickActionTile(
+                      icon: Icons.medication_liquid_rounded,
+                      iconBg: AppColors.purpleSoft,
+                      iconColor: AppColors.purple,
+                      label: 'Pharmacy',
+                      onTap: () {
+                        Navigator.of(sheetCtx).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const PharmacyInventoryScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _QuickActionTile(
+                      icon: Icons.hub_rounded,
+                      iconBg: AppColors.successSoft,
+                      iconColor: AppColors.success,
+                      label: 'Full APIs',
+                      onTap: () {
+                        Navigator.of(sheetCtx).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const ApiConnectionsScreen(),
                           ),
                         );
                       },

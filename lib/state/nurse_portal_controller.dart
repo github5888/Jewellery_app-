@@ -11,6 +11,7 @@ import '../models/bed_models.dart';
 import '../models/clinical_report_model.dart';
 import '../models/dashboard_data.dart';
 import '../models/duty_roster_model.dart';
+import '../models/hospital_modules_models.dart';
 import '../models/ipd_models.dart';
 import '../models/nurse_user.dart';
 import '../models/nursing_task_model.dart';
@@ -47,6 +48,8 @@ class NursePortalController extends ChangeNotifier {
   List<MedicationPrescription> _wardPrescriptions = const [];
   List<ClinicalReportRecord> _labReports = const [];
   List<ClinicalReportRecord> _radiologyReports = const [];
+  List<HospitalAppointmentItem> _appointments = const [];
+  List<ServerNotificationItem> _serverNotifications = const [];
 
   bool _isLoadingWorkspace = false;
   bool _isLoadingReports = false;
@@ -103,6 +106,8 @@ class NursePortalController extends ChangeNotifier {
   List<MedicationPrescription> get wardPrescriptions => _wardPrescriptions;
   List<ClinicalReportRecord> get labReports => _labReports;
   List<ClinicalReportRecord> get radiologyReports => _radiologyReports;
+  List<HospitalAppointmentItem> get appointments => _appointments;
+  List<ServerNotificationItem> get serverNotifications => _serverNotifications;
 
   bool get isLoadingWorkspace => _isLoadingWorkspace;
   bool get isLoadingReports => _isLoadingReports;
@@ -111,7 +116,9 @@ class NursePortalController extends ChangeNotifier {
 
   bool get socketConnected => _socketConnected;
   List<RealtimeClinicalEvent> get liveAlerts => List.unmodifiable(_liveAlerts);
-  int get unreadAlertsCount => _unreadAlertsCount;
+  int get unreadAlertsCount =>
+      _unreadAlertsCount +
+      _serverNotifications.where((n) => !n.isRead).length;
   RealtimeClinicalEvent? get latestBannerEvent => _latestBannerEvent;
 
   int get selectedNavIndex => _selectedNavIndex;
@@ -131,10 +138,25 @@ class NursePortalController extends ChangeNotifier {
   }
 
   void markAllAlertsRead() {
-    if (_unreadAlertsCount != 0) {
-      _unreadAlertsCount = 0;
-      notifyListeners();
+    for (final n in _serverNotifications.where((item) => !item.isRead)) {
+      if (n.id.isNotEmpty) {
+        api.markNotificationRead(n.id);
+      }
     }
+    _serverNotifications = _serverNotifications
+        .map(
+          (n) => ServerNotificationItem(
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            isRead: true,
+            createdAt: n.createdAt,
+          ),
+        )
+        .toList();
+    _unreadAlertsCount = 0;
+    notifyListeners();
   }
 
   // Computed real metrics (fallbacks to live array counts if dashboard endpoint omits any field)
@@ -565,6 +587,7 @@ class NursePortalController extends ChangeNotifier {
 
   Future<void> logout() async {
     _socketService.disconnect();
+    await api.logoutServer();
     await _clearAuthStorage();
     _currentUser = null;
     _dashboard = null;
@@ -577,6 +600,8 @@ class NursePortalController extends ChangeNotifier {
     _wardPrescriptions = const [];
     _labReports = const [];
     _radiologyReports = const [];
+    _appointments = const [];
+    _serverNotifications = const [];
     _liveAlerts.clear();
     _unreadAlertsCount = 0;
     _latestBannerEvent = null;
@@ -660,6 +685,14 @@ class NursePortalController extends ChangeNotifier {
         .fetchDutyRoster()
         .then((v) => v, onError: (_) => _allRosterShifts);
 
+    final appointmentsFuture = api
+        .fetchAppointments()
+        .then((v) => v, onError: (_) => _appointments);
+
+    final notificationsFuture = api
+        .fetchNotifications()
+        .then((v) => v, onError: (_) => _serverNotifications);
+
     final results = await Future.wait<dynamic>([
       dashFuture,
       ipdFuture,
@@ -668,6 +701,8 @@ class NursePortalController extends ChangeNotifier {
       groupsFuture,
       myRosterFuture,
       allRosterFuture,
+      appointmentsFuture,
+      notificationsFuture,
     ]);
 
     _dashboard = results[0] as NurseDashboardData?;
@@ -677,6 +712,8 @@ class NursePortalController extends ChangeNotifier {
     _bedGroups = results[4] as List<WardBedGroup>;
     _myShifts = results[5] as List<DutyShiftAssignment>;
     _allRosterShifts = results[6] as List<DutyShiftAssignment>;
+    _appointments = results[7] as List<HospitalAppointmentItem>;
+    _serverNotifications = results[8] as List<ServerNotificationItem>;
 
     // Hydrate full bedside charts (`GET /api/ipd/:id`) for admitted ward patients
     // so prescriptions (MAR), nurse_notes, consultant_register, and vitals history
