@@ -3,10 +3,13 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/ipd_models.dart';
+import '../../models/patient_directory_model.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 import '../beds/bed_status_screen.dart';
 import '../patients/ipd_patient_detail_screen.dart';
+import '../patients/patient_detail_screen.dart';
+import 'discharge_card_preview_modal.dart';
 
 /// Executive Mobile IPD In-Patient Ward Screen (`GET /api/ipd`):
 /// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `Bed Matrix` capsule
@@ -527,87 +530,188 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  flex: 4,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+            if (ipd.isDischarged)
+              Row(
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => IpdPatientDetailScreen(
+                              ipdId: ipd.id,
+                              initialAdmission: ipd,
+                              initialTabIndex: 0,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.assignment_ind_rounded, size: 15),
+                      label: const Text(
+                        'Open Chart',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => IpdPatientDetailScreen(
-                            ipdId: ipd.id,
-                            initialAdmission: ipd,
-                            initialTabIndex: 0,
-                          ),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.assignment_ind_rounded, size: 15),
-                    label: const Text(
-                      'Open Chart',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 4,
+                    child: _IpdQuickPillBtn(
+                      icon: Icons.print_outlined,
+                      label: 'Print Card',
+                      fg: const Color(0xFF035C7A),
+                      bg: const Color(0xFFE0F2FE),
+                      onTap: () => showDischargeCardPreviewModal(
+                        context,
+                        admission: ipd,
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: _IpdQuickPillBtn(
-                    icon: Icons.favorite_rounded,
-                    label: 'Vitals',
-                    fg: const Color(0xFFE11D48),
-                    bg: const Color(0xFFFFF1F2),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => IpdPatientDetailScreen(
-                            ipdId: ipd.id,
-                            initialAdmission: ipd,
-                            initialTabIndex: 1,
-                          ),
-                        ),
-                      );
-                    },
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: _IpdQuickPillBtn(
+                      icon: Icons.person_outline_rounded,
+                      label: 'Details',
+                      fg: const Color(0xFF059669),
+                      bg: AppColors.successSoft,
+                      onTap: () => _openFullPatientProfile(context, ipd),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: _IpdQuickPillBtn(
-                    icon: Icons.medication_rounded,
-                    label: 'Meds',
-                    fg: const Color(0xFF6D28D9),
-                    bg: const Color(0xFFF5F3FF),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => IpdPatientDetailScreen(
-                            ipdId: ipd.id,
-                            initialAdmission: ipd,
-                            initialTabIndex: 2,
-                            initialOrderSubTab: 0,
-                          ),
+                ],
+              )
+            else
+              Row(
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: primaryColor,
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      );
-                    },
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => IpdPatientDetailScreen(
+                              ipdId: ipd.id,
+                              initialAdmission: ipd,
+                              initialTabIndex: 0,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.assignment_ind_rounded, size: 15),
+                      label: const Text(
+                        'Open Chart',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
                   ),
-                ),
-              ],
-            ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: _IpdQuickPillBtn(
+                      icon: Icons.favorite_rounded,
+                      label: 'Vitals',
+                      fg: const Color(0xFFE11D48),
+                      bg: const Color(0xFFFFF1F2),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => IpdPatientDetailScreen(
+                              ipdId: ipd.id,
+                              initialAdmission: ipd,
+                              initialTabIndex: 1,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 3,
+                    child: _IpdQuickPillBtn(
+                      icon: Icons.medication_rounded,
+                      label: 'Meds',
+                      fg: const Color(0xFF6D28D9),
+                      bg: const Color(0xFFF5F3FF),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => IpdPatientDetailScreen(
+                              ipdId: ipd.id,
+                              initialAdmission: ipd,
+                              initialTabIndex: 2,
+                              initialOrderSubTab: 0,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _openFullPatientProfile(BuildContext context, IpdAdmission ipd) {
+    final ctrl = NursePortalScope.read(context);
+    final pat = ipd.patient;
+    PatientDirectoryRecord? match;
+    for (final item in ctrl.patientDirectory) {
+      if ((pat.id.isNotEmpty && item.id == pat.id) ||
+          (pat.patientUniqueId.isNotEmpty &&
+              item.patientUniqueId.toLowerCase() ==
+                  pat.patientUniqueId.toLowerCase())) {
+        match = item;
+        break;
+      }
+    }
+    final record = match ??
+        PatientDirectoryRecord(
+          id: pat.id,
+          patientUniqueId: pat.patientUniqueId,
+          patientName: pat.patientName,
+          age: pat.age,
+          dob: pat.dob,
+          gender: pat.gender,
+          bloodGroup: pat.bloodGroup,
+          phone: pat.mobileNo,
+          address: pat.address,
+          guardianName: pat.guardianName,
+          knownAllergies: pat.knownAllergies,
+          abhaNumber: pat.abhaNumber,
+          abhaAddress: pat.abhaAddress,
+          dueBalance: ipd.outstandingDue,
+          image: pat.image,
+        );
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PatientDetailScreen(initialPatient: record),
       ),
     );
   }

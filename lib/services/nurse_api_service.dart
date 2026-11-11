@@ -363,20 +363,172 @@ class NurseApiService {
   }
 
   Future<List<AbhaScanCheckinItem>> fetchAbhaQueue() async {
+    List<AbhaScanCheckinItem>? emptySuccess;
     for (final url in [
       endpoints.abhaScanShare,
+      endpoints.abhaCheckins,
       endpoints.abhaQueue,
       endpoints.abha,
     ]) {
       try {
         final res = await _client.get(url);
-        final list = JsonParsers.extractList(res)
-            .map(AbhaScanCheckinItem.fromJson)
-            .toList();
+        final list = JsonParsers.extractList(
+          res,
+          candidateKeys: const [
+            'checkins',
+            'check_ins',
+            'requests',
+            'tokens',
+            'queue',
+            'items',
+            'data',
+          ],
+        ).map(AbhaScanCheckinItem.fromJson).toList();
         if (list.isNotEmpty) return list;
+        emptySuccess ??= list;
       } catch (_) {}
     }
-    return const [];
+    return emptySuccess ?? const [];
+  }
+
+  /// Fetches Hospital Counter QR configuration (`Hospital QR Code` tab — image-37).
+  Future<AbhaHospitalQrInfo> fetchAbhaHospitalQrConfig({
+    String fallbackHospitalName = 'Smart Super Speciality Hospital',
+  }) async {
+    for (final url in [
+      endpoints.abhaScanShareQr,
+      endpoints.abhaQr,
+      endpoints.abhaConfig,
+      endpoints.abhaScanShare,
+    ]) {
+      try {
+        final res = await _client.get(url);
+        if (res is Map) {
+          final map = JsonParsers.asMap(res);
+          final inner = map['qr'] is Map
+              ? JsonParsers.asMap(map['qr'])
+              : (map['config'] is Map ? JsonParsers.asMap(map['config']) : map);
+          if (inner.containsKey('counter_id') ||
+              inner.containsKey('counterId') ||
+              inner.containsKey('facility_id') ||
+              inner.containsKey('facilityId') ||
+              inner.containsKey('hip_id') ||
+              inner.containsKey('qr_payload') ||
+              inner.containsKey('qr_image')) {
+            return AbhaHospitalQrInfo.fromJson(
+              inner,
+              fallbackHospitalName: fallbackHospitalName,
+            );
+          }
+        }
+      } catch (_) {}
+    }
+    return AbhaHospitalQrInfo.fromJson(
+      const <String, dynamic>{},
+      fallbackHospitalName: fallbackHospitalName,
+    );
+  }
+
+  static const List<Map<String, String>> _sampleAbdmProfiles = [
+    {
+      'name': 'Harpreet Singh',
+      'address': 'harpreet.singh28@abdm',
+      'abha': '91-7845-2391-6642',
+      'gender': 'Male',
+      'mobile': '9833445566',
+    },
+    {
+      'name': 'Ananya Mukherjee',
+      'address': 'ananya.mukherjee70@abdm',
+      'abha': '91-6120-8843-1905',
+      'gender': 'Female',
+      'mobile': '9822334455',
+    },
+    {
+      'name': 'Rohan Kulkarni',
+      'address': 'rohan.kulkarni14@abdm',
+      'abha': '91-5390-4412-8871',
+      'gender': 'Male',
+      'mobile': '9811223344',
+    },
+    {
+      'name': 'Meera Nair',
+      'address': 'meera.nair09@abdm',
+      'abha': '91-8421-9034-5518',
+      'gender': 'Female',
+      'mobile': '9845012345',
+    },
+  ];
+
+  /// Triggers `⚡ Simulate Patient Scan` on ABDM Scan & Share (`POST /api/abha/scan-share/simulate` — image-36).
+  Future<AbhaScanCheckinItem> simulateAbhaPatientScan({int seedIndex = 0}) async {
+    final now = DateTime.now();
+    final sample = _sampleAbdmProfiles[seedIndex % _sampleAbdmProfiles.length];
+    final hex = now.microsecondsSinceEpoch
+        .toRadixString(16)
+        .toUpperCase()
+        .padLeft(12, '0');
+    final code = 'CHK-${hex.substring(hex.length - 12)}';
+    final hh = now.hour.toString().padLeft(2, '0');
+    final mm = now.minute.toString().padLeft(2, '0');
+
+    final body = <String, dynamic>{
+      'check_in_code': code,
+      'check_in_id': code,
+      'token_no': code,
+      'patient_name': sample['name'],
+      'abha_address': sample['address'],
+      'abha_number': sample['abha'],
+      'gender': sample['gender'],
+      'mobile': sample['mobile'],
+      'counter_id': 'OPD-COUNTER-1',
+      'facility_id': 'IN0810000123',
+      'status': 'PENDING',
+      'time': '$hh:$mm',
+      'scanned_at': now.toUtc().toIso8601String(),
+    };
+
+    for (final url in [
+      endpoints.abhaScanShareSimulate,
+      endpoints.abhaSimulate,
+      endpoints.abhaScanShare,
+      endpoints.abhaCheckins,
+      endpoints.abhaQueue,
+    ]) {
+      try {
+        final res = await _client.post(url, body: body);
+        final obj = JsonParsers.extractObject(res);
+        if (obj.isNotEmpty) {
+          return AbhaScanCheckinItem.fromJson(obj);
+        }
+        return AbhaScanCheckinItem.fromJson(body);
+      } on ApiException catch (e) {
+        if (!e.isNotFound) rethrow;
+      }
+    }
+
+    return AbhaScanCheckinItem.fromJson(body);
+  }
+
+  /// Dismisses / removes an ABDM Scan & Share check-in (`×` button in image-36).
+  Future<void> dismissAbhaScanCheckin(String checkinId) async {
+    if (checkinId.trim().isEmpty) return;
+    for (final action in <Future<dynamic> Function()>[
+      () => _client.delete(endpoints.abhaScanShareItem(checkinId)),
+      () => _client.post(
+            endpoints.abhaScanShareDismiss(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
+      () => _client.put(
+            endpoints.abhaScanShareItem(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
+    ]) {
+      try {
+        await action();
+        return;
+      } catch (_) {}
+    }
   }
 
   bool _matchesPatientRecord(
@@ -940,34 +1092,75 @@ class NurseApiService {
   Future<void> recordOpdTriageVitals({
     required String opdId,
     required String bp,
+    String systolic = '',
+    String diastolic = '',
     required String pulse,
     required String temperature,
     required String spo2,
     String respiratoryRate = '',
     String weight = '',
     String height = '',
+    String symptoms = '',
     String notes = '',
     String? recordedBy,
     String? recordedById,
     DateTime? date,
   }) async {
+    final isoDate = (date ?? DateTime.now()).toUtc().toIso8601String();
     final payload = <String, dynamic>{
-      'date': (date ?? DateTime.now()).toUtc().toIso8601String(),
+      'date': isoDate,
       if (bp.trim().isNotEmpty) 'bp': bp.trim(),
+      if (systolic.trim().isNotEmpty) 'systolic': systolic.trim(),
+      if (diastolic.trim().isNotEmpty) 'diastolic': diastolic.trim(),
       if (pulse.trim().isNotEmpty) 'pulse': pulse.trim(),
       if (temperature.trim().isNotEmpty) 'temperature': temperature.trim(),
       if (spo2.trim().isNotEmpty) 'spo2': spo2.trim(),
-      if (respiratoryRate.trim().isNotEmpty)
+      if (respiratoryRate.trim().isNotEmpty) ...{
         'respiratory_rate': respiratoryRate.trim(),
+        'respiration': respiratoryRate.trim(),
+      },
       if (weight.trim().isNotEmpty) 'weight': weight.trim(),
       if (height.trim().isNotEmpty) 'height': height.trim(),
+      if (symptoms.trim().isNotEmpty) ...{
+        'symptoms': symptoms.trim(),
+        'symptoms_description': symptoms.trim(),
+      },
       if (recordedBy != null && recordedBy.trim().isNotEmpty)
         'recorded_by': recordedBy.trim(),
       if (recordedById != null && recordedById.trim().isNotEmpty)
         'recorded_by_id': recordedById.trim(),
       if (notes.trim().isNotEmpty) 'notes': notes.trim(),
     };
-    await _client.post(endpoints.opdVitals(opdId), body: payload);
+
+    bool vitalsSaved = false;
+    ApiException? vitalsErr;
+    try {
+      await _client.post(endpoints.opdVitals(opdId), body: payload);
+      vitalsSaved = true;
+    } on ApiException catch (e) {
+      vitalsErr = e;
+      if (!e.isNotFound) rethrow;
+    }
+
+    // Sync `symptoms` (`Patient Chief Complaints / Symptoms` — image-35) and fallback vitals onto `/api/opd/:id`
+    if (symptoms.trim().isNotEmpty || !vitalsSaved) {
+      try {
+        await _client.put(
+          endpoints.opdDetail(opdId),
+          body: <String, dynamic>{
+            if (symptoms.trim().isNotEmpty) ...{
+              'symptoms': symptoms.trim(),
+              'symptoms_description': symptoms.trim(),
+            },
+            'vitals': payload,
+            ...payload,
+          },
+        );
+        vitalsSaved = true;
+      } catch (_) {
+        if (!vitalsSaved && vitalsErr != null) throw vitalsErr;
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

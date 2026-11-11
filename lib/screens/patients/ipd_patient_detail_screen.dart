@@ -4,15 +4,18 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
 import '../../models/clinical_report_model.dart';
 import '../../models/ipd_models.dart';
+import '../../models/patient_directory_model.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 import '../../widgets/patient_avatar.dart';
 import '../../widgets/status_badge.dart';
 import '../clinical_actions/bed_transfer_sheet.dart';
 import '../clinical_actions/nursing_charge_sheet.dart';
+import '../ipd/discharge_card_preview_modal.dart';
 import '../notes/nursing_notes_screen.dart';
 import '../reports/report_viewer_screen.dart';
 import '../vitals/record_vitals_screen.dart';
+import 'patient_detail_screen.dart';
 
 /// Full Bedside IPD Clinical Chart (`GET /api/ipd/:id`)
 /// Matches the 5-tab website modal (`Admission Overview`, `Vitals & Findings`,
@@ -556,6 +559,15 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                 label: 'Antenatal:',
                 value: ipd.isAntenatal ? 'Yes' : 'No',
               ),
+              if (ipd.isDischarged || ipd.dischargeDate != null)
+                _OverviewKeyValueRow(
+                  label: 'Discharge Date:',
+                  value: AppFormatters.formatSlashDate(
+                    ipd.dischargeDate ?? ipd.admissionDate,
+                  ),
+                  valueColor: const Color(0xFF035C7A),
+                  valueWeight: FontWeight.w800,
+                ),
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Divider(height: 1, color: Color(0xFFE2E8F0)),
@@ -625,6 +637,42 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                   ),
                 ),
               ),
+              if (ipd.isDischarged || ipd.clinicalSummary.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Clinical Summary & Inpatient Course:',
+                  style: TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    ipd.clinicalSummary.isNotEmpty
+                        ? ipd.clinicalSummary
+                        : (ipd.nurseNotes.isNotEmpty
+                            ? ipd.nurseNotes.first.note
+                            : 'Patient discharged in stable clinical condition.'),
+                    style: const TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -2182,6 +2230,32 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF035C7A),
+                    side: const BorderSide(color: Color(0xFF7DD3FC)),
+                    minimumSize: const Size(double.infinity, 44),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: () => showDischargeCardPreviewModal(
+                    context,
+                    admission: ipd,
+                  ),
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                  label: const Text(
+                    'Preview & Print Discharge Card (A4)',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -2296,6 +2370,64 @@ class _WebsiteChartBanner extends StatelessWidget {
                           ],
                         ),
                       ],
+                    ),
+                  ),
+                  if (ipd.isDischarged)
+                    IconButton(
+                      tooltip: 'Discharge Card Preview & Print',
+                      onPressed: () => showDischargeCardPreviewModal(
+                        context,
+                        admission: ipd,
+                      ),
+                      icon: const Icon(
+                        Icons.print_outlined,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  IconButton(
+                    tooltip: 'Full Patient Profile',
+                    onPressed: () {
+                      final ctrl = NursePortalScope.read(context);
+                      PatientDirectoryRecord? match;
+                      for (final item in ctrl.patientDirectory) {
+                        if ((pat.id.isNotEmpty && item.id == pat.id) ||
+                            (pat.patientUniqueId.isNotEmpty &&
+                                item.patientUniqueId.toLowerCase() ==
+                                    pat.patientUniqueId.toLowerCase())) {
+                          match = item;
+                          break;
+                        }
+                      }
+                      final record = match ??
+                          PatientDirectoryRecord(
+                            id: pat.id,
+                            patientUniqueId: pat.patientUniqueId,
+                            patientName: pat.patientName,
+                            age: pat.age,
+                            dob: pat.dob,
+                            gender: pat.gender,
+                            bloodGroup: pat.bloodGroup,
+                            phone: pat.mobileNo,
+                            address: pat.address,
+                            guardianName: pat.guardianName,
+                            knownAllergies: pat.knownAllergies,
+                            abhaNumber: pat.abhaNumber,
+                            abhaAddress: pat.abhaAddress,
+                            dueBalance: ipd.outstandingDue,
+                            image: pat.image,
+                          );
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              PatientDetailScreen(initialPatient: record),
+                        ),
+                      );
+                    },
+                    icon: const Icon(
+                      Icons.person_search_outlined,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
                   IconButton(

@@ -725,6 +725,41 @@ class NursePortalController extends ChangeNotifier {
     }
   }
 
+  Future<List<AbhaScanCheckinItem>> refreshAbhaQueue() async {
+    try {
+      final fetched = await api.fetchAbhaQueue();
+      if (fetched.isNotEmpty) {
+        _abhaQueue = fetched;
+        notifyListeners();
+      }
+      return _abhaQueue;
+    } catch (_) {
+      return _abhaQueue;
+    }
+  }
+
+  Future<AbhaScanCheckinItem> triggerSimulateAbhaScan() async {
+    final created = await api.simulateAbhaPatientScan(
+      seedIndex: _abhaQueue.length,
+    );
+    final updated = <AbhaScanCheckinItem>[
+      created,
+      ..._abhaQueue.where((x) => x.displayCode != created.displayCode),
+    ];
+    _abhaQueue = updated;
+    notifyListeners();
+    refreshAbhaQueue();
+    return created;
+  }
+
+  Future<void> dismissAbhaCheckinItem(AbhaScanCheckinItem item) async {
+    _abhaQueue = _abhaQueue
+        .where((x) => x.id != item.id && x.displayCode != item.displayCode)
+        .toList();
+    notifyListeners();
+    await api.dismissAbhaScanCheckin(item.id);
+  }
+
   Future<void> refreshWorkspace({bool silent = false}) async {
     if (_authStage != AuthStage.authenticated) return;
     if (!silent) {

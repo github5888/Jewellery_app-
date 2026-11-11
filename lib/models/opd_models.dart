@@ -34,7 +34,10 @@ class OpdVisitRecord {
     return triageVitals!.bp.isNotEmpty ||
         triageVitals!.pulse.isNotEmpty ||
         triageVitals!.temperature.isNotEmpty ||
-        triageVitals!.spo2.isNotEmpty;
+        triageVitals!.spo2.isNotEmpty ||
+        triageVitals!.respiratoryRate.isNotEmpty ||
+        triageVitals!.weight.isNotEmpty ||
+        triageVitals!.height.isNotEmpty;
   }
 
   /// Normalizes backend status string into the exact 5 OPD tabs on `/opd` (image-7):

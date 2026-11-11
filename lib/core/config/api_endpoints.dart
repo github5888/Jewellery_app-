@@ -42,6 +42,15 @@ class ApiEndpoints {
   String patientAbha(String patientId) => _url('/api/patients/$patientId/abha');
   String get abha => _url('/api/abha');
   String get abhaScanShare => _url('/api/abha/scan-share');
+  String abhaScanShareItem(String id) => _url('/api/abha/scan-share/$id');
+  String abhaScanShareDismiss(String id) =>
+      _url('/api/abha/scan-share/$id/dismiss');
+  String get abhaScanShareSimulate => _url('/api/abha/scan-share/simulate');
+  String get abhaSimulate => _url('/api/abha/simulate');
+  String get abhaScanShareQr => _url('/api/abha/scan-share/qr');
+  String get abhaQr => _url('/api/abha/qr');
+  String get abhaConfig => _url('/api/abha/config');
+  String get abhaCheckins => _url('/api/abha/checkins');
   String get abhaQueue => _url('/api/abha/queue');
   String get abhaAadhaarGenerateOtp => _url('/api/abha/aadhaar/generate-otp');
   String get abhaAadhaarVerifyOtp => _url('/api/abha/aadhaar/verify-otp');

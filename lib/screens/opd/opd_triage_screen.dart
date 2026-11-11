@@ -6,6 +6,7 @@ import '../../models/opd_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 import '../vitals/record_vitals_screen.dart';
+import 'abha_scan_share_modal.dart';
 
 /// Executive Mobile OPD Queue & Triage Screen (`GET /api/opd`):
 /// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `ABHA Scan` capsule
@@ -265,7 +266,32 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
     }
     return Scaffold(
       backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(title: const Text('OPD - Out Patient')),
+      appBar: AppBar(
+        title: const Text('OPD - Out Patient'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton.icon(
+              onPressed: () => _showAbhaQueueSheet(context),
+              icon: const Icon(
+                Icons.qr_code_scanner_rounded,
+                size: 17,
+                color: Color(0xFFB45309),
+              ),
+              label: Text(
+                controller.pendingAbhaCount > 0
+                    ? 'ABHA Scan (${controller.pendingAbhaCount})'
+                    : 'ABHA Scan & Share',
+                style: const TextStyle(
+                  color: Color(0xFFB45309),
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: PremiumScreenBackground(
         accentColor: primary,
         child: content,
@@ -274,150 +300,7 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
   }
 
   void _showAbhaQueueSheet(BuildContext context) {
-    final controller = NursePortalScope.read(context);
-    final tokens = controller.abhaQueue;
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        return Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(ctx).size.height * 0.78,
-          ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4.5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const GradientIconBadge(
-                    icon: Icons.qr_code_scanner_rounded,
-                    colors: [Color(0xFF10B981), Color(0xFF047857)],
-                    size: 38,
-                    iconSize: 19,
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'ABHA Scan & Share Queue',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                        Text(
-                          'Live ABDM fast-track OPD desk tokens',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    onPressed: () => Navigator.of(ctx).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              Expanded(
-                child: tokens.isEmpty
-                    ? const ClinicalEmptyState(
-                        icon: Icons.qr_code_2_rounded,
-                        title: 'No Pending ABHA Scan Tokens',
-                        subtitle:
-                            'Patients scanning the hospital ABDM QR code appear here.',
-                      )
-                    : ListView.separated(
-                        itemCount: tokens.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final t = tokens[index];
-                          return SoftSurfaceCard(
-                            padding: const EdgeInsets.all(13),
-                            borderRadius: BorderRadius.circular(18),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 11,
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.successSoft,
-                                    borderRadius: BorderRadius.circular(11),
-                                  ),
-                                  child: Text(
-                                    '#${t.tokenNumber}',
-                                    style: const TextStyle(
-                                      color: Color(0xFF059669),
-                                      fontWeight: FontWeight.w900,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        t.patientName,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w800,
-                                          fontSize: 14.5,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        [
-                                          if (t.abhaNumber.isNotEmpty)
-                                            t.abhaNumber,
-                                          if (t.mobile.isNotEmpty) t.mobile,
-                                          t.status,
-                                        ].join(' • '),
-                                        style: const TextStyle(
-                                          color: AppColors.textSecondary,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    showAbhaScanShareModal(context);
   }
 }
 

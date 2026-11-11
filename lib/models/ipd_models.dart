@@ -867,6 +867,8 @@ class IpdAdmission {
   final String admissionType;
   final String provisionalDiagnosis;
   final String presentingComplaint;
+  final String clinicalSummary;
+  final String dischargeInstructions;
   final String referringDoctor;
   final String department;
   final String attendantName;
@@ -904,6 +906,8 @@ class IpdAdmission {
     required this.admissionType,
     required this.provisionalDiagnosis,
     this.presentingComplaint = '',
+    this.clinicalSummary = '',
+    this.dischargeInstructions = '',
     this.referringDoctor = '',
     required this.department,
     required this.attendantName,
@@ -945,6 +949,8 @@ class IpdAdmission {
       admissionType: admissionType,
       provisionalDiagnosis: provisionalDiagnosis,
       presentingComplaint: presentingComplaint,
+      clinicalSummary: clinicalSummary,
+      dischargeInstructions: dischargeInstructions,
       referringDoctor: referringDoctor,
       department: department,
       attendantName: attendantName,
@@ -1005,6 +1011,14 @@ class IpdAdmission {
     if (bed.isNotEmpty) return bed;
     if (bedGroup.isNotEmpty) return bedGroup;
     return 'Unassigned Bed';
+  }
+
+  /// Matches `Deluxe-201 (General Ward Male)` format on Discharge Card Preview (image-38).
+  String get bedDisplayLabel {
+    if (bed.isNotEmpty && bedGroup.isNotEmpty) {
+      return '$bed ($bedGroup)';
+    }
+    return wardAndBedLabel;
   }
 
   /// Computes clinical badge label directly from real patient status, emergency flags, and latest vitals.
@@ -1201,6 +1215,24 @@ class IpdAdmission {
             json['symptoms_title'] ??
             json['reason'] ??
             json['note'],
+      ),
+      clinicalSummary: JsonParsers.asString(
+        json['clinical_summary'] ??
+            json['clinicalSummary'] ??
+            json['discharge_summary'] ??
+            json['dischargeSummary'] ??
+            json['inpatient_course'] ??
+            json['summary'] ??
+            json['discharge_note'] ??
+            json['note'],
+      ),
+      dischargeInstructions: JsonParsers.asString(
+        json['discharge_instructions'] ??
+            json['dischargeInstructions'] ??
+            json['post_discharge_instructions'] ??
+            json['follow_up_instructions'] ??
+            json['advice'] ??
+            json['follow_up'],
       ),
       referringDoctor: JsonParsers.asString(
         json['referring_doctor'] ??

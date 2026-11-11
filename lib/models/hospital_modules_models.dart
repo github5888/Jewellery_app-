@@ -481,6 +481,7 @@ class AbhaScanCheckinItem {
   final String gender;
   final String mobile;
   final String status;
+  final String timeString;
   final DateTime? createdAt;
 
   const AbhaScanCheckinItem({
@@ -492,6 +493,7 @@ class AbhaScanCheckinItem {
     required this.gender,
     required this.mobile,
     required this.status,
+    this.timeString = '',
     this.createdAt,
   });
 
@@ -504,31 +506,143 @@ class AbhaScanCheckinItem {
         s == 'scanned';
   }
 
+  String get displayCode {
+    final t = tokenNumber.trim();
+    if (t.isEmpty) {
+      final tail = id.length > 8 ? id.substring(id.length - 8).toUpperCase() : id.toUpperCase();
+      return tail.isEmpty ? 'CHK-ABDM' : 'CHK-$tail';
+    }
+    return t;
+  }
+
+  String get displayTime {
+    if (timeString.trim().isNotEmpty) return timeString.trim();
+    if (createdAt != null) return AppFormatters.formatTime24h(createdAt);
+    return '';
+  }
+
   factory AbhaScanCheckinItem.fromJson(Map<String, dynamic> json) {
     final rawDoc = AppFormatters.initials(
       JsonParsers.asString(json['patient_name'] ?? json['name']),
     );
+    final patMap = json['patient'] is Map
+        ? JsonParsers.asMap(json['patient'])
+        : <String, dynamic>{};
     return AbhaScanCheckinItem(
-      id: JsonParsers.asId(json['_id'] ?? json['id'] ?? rawDoc),
+      id: JsonParsers.asId(
+        json['_id'] ??
+            json['id'] ??
+            json['check_in_id'] ??
+            json['checkin_id'] ??
+            rawDoc,
+      ),
       tokenNumber: JsonParsers.asString(
-        json['token_no'] ?? json['tokenNo'] ?? json['token'] ?? json['queue_no'],
+        json['check_in_code'] ??
+            json['checkin_code'] ??
+            json['check_in_id'] ??
+            json['checkin_id'] ??
+            json['code'] ??
+            json['request_id'] ??
+            json['token_no'] ??
+            json['tokenNo'] ??
+            json['token'] ??
+            json['queue_no'],
       ),
       patientName: JsonParsers.asString(
-        json['patient_name'] ?? json['patientName'] ?? json['name'],
+        json['patient_name'] ??
+            json['patientName'] ??
+            json['name'] ??
+            patMap['patient_name'] ??
+            patMap['name'],
         fallback: 'ABHA Check-in',
       ),
       abhaNumber: JsonParsers.asString(
-        json['abha_number'] ?? json['abhaNumber'] ?? json['abha_no'],
+        json['abha_number'] ??
+            json['abhaNumber'] ??
+            json['abha_no'] ??
+            patMap['abha_number'],
       ),
       abhaAddress: JsonParsers.asString(
-        json['abha_address'] ?? json['abhaAddress'],
+        json['abha_address'] ??
+            json['abhaAddress'] ??
+            json['health_id'] ??
+            patMap['abha_address'],
       ),
-      gender: JsonParsers.asString(json['gender']),
+      gender: JsonParsers.asString(json['gender'] ?? patMap['gender']),
       mobile: JsonParsers.asString(
-        json['mobile'] ?? json['mobileno'] ?? json['phone'],
+        json['mobile'] ??
+            json['mobileno'] ??
+            json['phone'] ??
+            patMap['mobileno'] ??
+            patMap['phone'],
       ),
-      status: JsonParsers.asString(json['status'], fallback: 'pending'),
-      createdAt: JsonParsers.asDateTime(json['createdAt'] ?? json['date']),
+      status: JsonParsers.asString(json['status'], fallback: 'PENDING'),
+      timeString: JsonParsers.asString(json['time'] ?? json['scan_time']),
+      createdAt: JsonParsers.asDateTime(
+        json['scanned_at'] ??
+            json['scannedAt'] ??
+            json['createdAt'] ??
+            json['date'],
+      ),
+    );
+  }
+}
+
+/// Hospital Counter QR configuration (`ABDM Scan & Share` -> `Hospital QR Code` — image-37)
+class AbhaHospitalQrInfo {
+  final String hospitalName;
+  final String counterId;
+  final String facilityId;
+  final String qrPayload;
+  final String? qrImage;
+
+  const AbhaHospitalQrInfo({
+    required this.hospitalName,
+    required this.counterId,
+    required this.facilityId,
+    required this.qrPayload,
+    this.qrImage,
+  });
+
+  factory AbhaHospitalQrInfo.fromJson(
+    Map<String, dynamic> json, {
+    String fallbackHospitalName = 'Smart Super Speciality Hospital',
+  }) {
+    final name = JsonParsers.asString(
+      json['hospital_name'] ??
+          json['hospitalName'] ??
+          json['facility_name'] ??
+          json['name'],
+      fallback: fallbackHospitalName,
+    );
+    final counter = JsonParsers.asString(
+      json['counter_id'] ?? json['counterId'] ?? json['counter'],
+      fallback: 'OPD-COUNTER-1',
+    );
+    final facility = JsonParsers.asString(
+      json['facility_id'] ??
+          json['facilityId'] ??
+          json['hip_id'] ??
+          json['hipId'],
+      fallback: 'IN0810000123',
+    );
+    final payload = JsonParsers.asString(
+      json['qr_payload'] ??
+          json['qrPayload'] ??
+          json['qr_data'] ??
+          json['qrData'] ??
+          json['url'],
+      fallback: '{"hipId":"$facility","counterId":"$counter","name":"$name"}',
+    );
+    final img = JsonParsers.asString(
+      json['qr_image'] ?? json['qrImage'] ?? json['qr_code'] ?? json['qrCode'],
+    );
+    return AbhaHospitalQrInfo(
+      hospitalName: name.isEmpty ? fallbackHospitalName : name,
+      counterId: counter.isEmpty ? 'OPD-COUNTER-1' : counter,
+      facilityId: facility.isEmpty ? 'IN0810000123' : facility,
+      qrPayload: payload,
+      qrImage: img.isEmpty ? null : img,
     );
   }
 }

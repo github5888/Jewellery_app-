@@ -6,9 +6,16 @@ import '../../models/opd_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/patient_avatar.dart';
 
-/// Website-Aligned Bedside & Triage Vitals Entry (`+ Record Vitals`):
-/// Submits live vitals (`Blood Pressure`, `Pulse`, `Temperature`, `SpO₂`, `Weight`, `Height`, `Notes`)
-/// to `POST /api/ipd/:id/vitals` (IPD ward) or `POST /api/opd/:id/vitals` (OPD triage).
+/// Website-Aligned Triage & Bedside Vitals Form (`image-35.png`):
+/// - `Blood Pressure (BP)`: `Systolic` / `Diastolic`
+/// - `Pulse (bpm)`
+/// - `SpO₂ (%)`
+/// - `Temperature (°F)`
+/// - `Respiration (/min)`
+/// - `Weight (kg)` & `Height (cm)`
+/// - `Patient Chief Complaints / Symptoms` (OPD — pre-filled with `opdVisit.symptoms`)
+///   or `Clinical Notes / Observations` (IPD)
+/// Submits live to `POST /api/opd/:id/vitals` (+ `PUT /api/opd/:id`) or `POST /api/ipd/:id/vitals`.
 class RecordVitalsScreen extends StatefulWidget {
   final IpdAdmission? ipdAdmission;
   final OpdVisitRecord? opdVisit;
@@ -24,59 +31,106 @@ class RecordVitalsScreen extends StatefulWidget {
 }
 
 class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
-  final _bpCtrl = TextEditingController();
+  final _systolicCtrl = TextEditingController();
+  final _diastolicCtrl = TextEditingController();
   final _pulseCtrl = TextEditingController();
-  final _tempCtrl = TextEditingController();
   final _spo2Ctrl = TextEditingController();
+  final _tempCtrl = TextEditingController();
+  final _respCtrl = TextEditingController();
   final _weightCtrl = TextEditingController();
   final _heightCtrl = TextEditingController();
-  final _notesCtrl = TextEditingController();
+  final _notesOrSymptomsCtrl = TextEditingController();
 
   bool _saving = false;
 
   @override
   void initState() {
     super.initState();
+    final isOpd = widget.opdVisit != null;
     final prev =
-        widget.ipdAdmission?.latestVital ?? widget.opdVisit?.triageVitals;
+        isOpd ? widget.opdVisit!.triageVitals : widget.ipdAdmission?.latestVital;
+
     if (prev != null) {
       if (prev.weight.isNotEmpty) _weightCtrl.text = prev.weight;
       if (prev.height.isNotEmpty) _heightCtrl.text = prev.height;
+
+      // Pre-populate existing OPD triage vitals when editing/re-opening
+      if (isOpd) {
+        if (prev.bp.isNotEmpty) {
+          final parts = prev.bp.split('/');
+          _systolicCtrl.text = parts.first.trim();
+          if (parts.length > 1) {
+            _diastolicCtrl.text = parts.sublist(1).join('/').trim();
+          }
+        }
+        if (prev.pulse.isNotEmpty) _pulseCtrl.text = prev.pulse;
+        if (prev.spo2.isNotEmpty) _spo2Ctrl.text = prev.spo2;
+        if (prev.temperature.isNotEmpty) _tempCtrl.text = prev.temperature;
+        if (prev.respiratoryRate.isNotEmpty) {
+          _respCtrl.text = prev.respiratoryRate;
+        }
+      }
+    }
+
+    if (isOpd) {
+      final sym = widget.opdVisit!.symptoms.trim();
+      if (sym.isNotEmpty) {
+        _notesOrSymptomsCtrl.text = sym;
+      } else if (prev != null && prev.notes.trim().isNotEmpty) {
+        _notesOrSymptomsCtrl.text = prev.notes.trim();
+      }
     }
   }
 
   @override
   void dispose() {
-    _bpCtrl.dispose();
+    _systolicCtrl.dispose();
+    _diastolicCtrl.dispose();
     _pulseCtrl.dispose();
-    _tempCtrl.dispose();
     _spo2Ctrl.dispose();
+    _tempCtrl.dispose();
+    _respCtrl.dispose();
     _weightCtrl.dispose();
     _heightCtrl.dispose();
-    _notesCtrl.dispose();
+    _notesOrSymptomsCtrl.dispose();
     super.dispose();
+  }
+
+  String _composeBp() {
+    final sys = _systolicCtrl.text.trim();
+    final dia = _diastolicCtrl.text.trim();
+    if (sys.isNotEmpty && dia.isNotEmpty) return '$sys/$dia';
+    if (sys.isNotEmpty) return sys;
+    if (dia.isNotEmpty) return dia;
+    return '';
   }
 
   Future<void> _saveVitals() async {
     FocusScope.of(context).unfocus();
 
-    final bp = _bpCtrl.text.trim();
+    final sys = _systolicCtrl.text.trim();
+    final dia = _diastolicCtrl.text.trim();
+    final bp = _composeBp();
     final pulse = _pulseCtrl.text.trim();
-    final temp = _tempCtrl.text.trim();
     final spo2 = _spo2Ctrl.text.trim();
+    final temp = _tempCtrl.text.trim();
+    final resp = _respCtrl.text.trim();
     final weight = _weightCtrl.text.trim();
     final height = _heightCtrl.text.trim();
+    final textRemarks = _notesOrSymptomsCtrl.text.trim();
 
     if (bp.isEmpty &&
         pulse.isEmpty &&
-        temp.isEmpty &&
         spo2.isEmpty &&
+        temp.isEmpty &&
+        resp.isEmpty &&
         weight.isEmpty &&
-        height.isEmpty) {
+        height.isEmpty &&
+        (widget.opdVisit == null || textRemarks.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Please enter at least one vital sign (BP, Pulse, Temperature, SpO₂, Weight, or Height).',
+            'Please enter at least one vital sign (BP, Pulse, SpO₂, Temperature, Respiration, Weight, or Height).',
           ),
           backgroundColor: AppColors.danger,
         ),
@@ -96,9 +150,10 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
           pulse: pulse,
           temperature: temp,
           spo2: spo2,
+          respiratoryRate: resp,
           weight: weight,
           height: height,
-          notes: _notesCtrl.text.trim(),
+          notes: textRemarks,
           recordedBy: nurse?.fullName,
           recordedById: nurse?.id,
         );
@@ -106,12 +161,16 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
         await controller.api.recordOpdTriageVitals(
           opdId: widget.opdVisit!.id,
           bp: bp,
+          systolic: sys,
+          diastolic: dia,
           pulse: pulse,
           temperature: temp,
           spo2: spo2,
+          respiratoryRate: resp,
           weight: weight,
           height: height,
-          notes: _notesCtrl.text.trim(),
+          symptoms: textRemarks,
+          notes: textRemarks,
           recordedBy: nurse?.fullName,
           recordedById: nurse?.id,
         );
@@ -121,7 +180,7 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Vitals & clinical observation recorded successfully.'),
+          content: Text('Vitals saved and synced successfully.'),
           backgroundColor: AppColors.success,
         ),
       );
@@ -142,12 +201,10 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
   @override
   Widget build(BuildContext context) {
     final isIpd = widget.ipdAdmission != null;
-    final patient = isIpd
-        ? widget.ipdAdmission!.patient
-        : widget.opdVisit!.patient;
-    final badge1 = isIpd
-        ? widget.ipdAdmission!.ipdNo
-        : widget.opdVisit!.opdNo;
+    final patient =
+        isIpd ? widget.ipdAdmission!.patient : widget.opdVisit!.patient;
+    final badge1 =
+        isIpd ? widget.ipdAdmission!.ipdNo : widget.opdVisit!.opdNo;
     final badge2 = isIpd
         ? 'Bed ${widget.ipdAdmission!.bed.isEmpty ? 'Unassigned' : widget.ipdAdmission!.bed}'
         : (widget.opdVisit!.caseReferenceId.isNotEmpty
@@ -157,12 +214,12 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF3F6FB),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0B1E3F),
+        backgroundColor: const Color(0xFF034C6A),
         foregroundColor: Colors.white,
         elevation: 0,
-        title: const Text(
-          'Record Clinical Vitals',
-          style: TextStyle(
+        title: Text(
+          isIpd ? 'Record Bedside Vitals' : 'OPD Triage Vitals',
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 16.5,
             fontWeight: FontWeight.w800,
@@ -172,12 +229,12 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
-          // Patient Banner Card
+          // Patient Context Banner
           Container(
             padding: const EdgeInsets.all(15),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF0B1E3F), Color(0xFF173D7A)],
+                colors: [Color(0xFF034C6A), Color(0xFF026789)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -227,7 +284,7 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
           ),
           const SizedBox(height: 16),
 
-          // Exact 6 Website Vital Fields (2-column compact clinical form)
+          // Exact Website Vitals Form Card (`image-35.png`)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -238,58 +295,98 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
-                  children: [
-                    Icon(
-                      Icons.monitor_heart_outlined,
-                      size: 18,
-                      color: Color(0xFF2563EB),
-                    ),
-                    SizedBox(width: 7),
-                    Text(
-                      'Bedside Vital Parameters',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _VitalLabeledInput(
-                        label: 'Blood Pressure',
-                        unit: 'mmHg',
-                        hint: '120/80',
-                        controller: _bpCtrl,
-                        keyboardType: TextInputType.datetime,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _VitalLabeledInput(
-                        label: 'Pulse',
-                        unit: 'bpm',
-                        hint: '76',
-                        controller: _pulseCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: false,
+                // Row 1: Blood Pressure (Systolic / Diastolic) + Pulse (bpm)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bpField = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const _FieldTitle('Blood Pressure (BP)'),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _systolicCtrl,
+                                keyboardType: TextInputType.number,
+                                style: _fieldTextStyle,
+                                decoration: _boxDecoration('Systolic'),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 7),
+                              child: Text(
+                                '/',
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: TextField(
+                                controller: _diastolicCtrl,
+                                keyboardType: TextInputType.number,
+                                style: _fieldTextStyle,
+                                decoration: _boxDecoration('Diastolic'),
+                              ),
+                            ),
+                          ],
                         ),
+                      ],
+                    );
+
+                    final pulseField = _VitalLabeledInput(
+                      label: 'Pulse (bpm)',
+                      hint: 'e.g. 72',
+                      controller: _pulseCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: false,
                       ),
-                    ),
-                  ],
+                    );
+
+                    if (constraints.maxWidth >= 430) {
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: bpField),
+                          const SizedBox(width: 12),
+                          Expanded(child: pulseField),
+                        ],
+                      );
+                    }
+                    return Column(
+                      children: [
+                        bpField,
+                        const SizedBox(height: 12),
+                        pulseField,
+                      ],
+                    );
+                  },
                 ),
+
                 const SizedBox(height: 12),
+
+                // Row 2: SpO2 (%) full width (exact layout in image-35)
+                _VitalLabeledInput(
+                  label: 'SpO₂ (%)',
+                  hint: 'Enter oxygen saturation...',
+                  controller: _spo2Ctrl,
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: false,
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Row 3: Temperature (°F) + Respiration (/min)
                 Row(
                   children: [
                     Expanded(
                       child: _VitalLabeledInput(
-                        label: 'Temperature',
-                        unit: '°F',
-                        hint: '98.6',
+                        label: 'Temperature (°F)',
+                        hint: 'e.g. 98.6',
                         controller: _tempCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -299,10 +396,9 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _VitalLabeledInput(
-                        label: 'SpO₂',
-                        unit: '%',
-                        hint: '98',
-                        controller: _spo2Ctrl,
+                        label: 'Respiration (/min)',
+                        hint: 'e.g. 18',
+                        controller: _respCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: false,
                         ),
@@ -310,14 +406,16 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 12),
+
+                // Row 4: Weight (kg) + Height (cm)
                 Row(
                   children: [
                     Expanded(
                       child: _VitalLabeledInput(
-                        label: 'Weight',
-                        unit: 'kg',
-                        hint: '65',
+                        label: 'Weight (kg)',
+                        hint: 'e.g. 65',
                         controller: _weightCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -327,9 +425,8 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: _VitalLabeledInput(
-                        label: 'Height',
-                        unit: 'cm',
-                        hint: '170',
+                        label: 'Height (cm)',
+                        hint: 'e.g. 172',
                         controller: _heightCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
                           decimal: true,
@@ -338,22 +435,24 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 14),
-                const Text(
-                  'Clinical Notes / Observations',
-                  style: TextStyle(
-                    color: Color(0xFF475569),
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w700,
-                  ),
+
+                // Row 5: Patient Chief Complaints / Symptoms (image-35)
+                _FieldTitle(
+                  isIpd
+                      ? 'Clinical Notes / Observations'
+                      : 'Patient Chief Complaints / Symptoms',
                 ),
                 const SizedBox(height: 6),
                 TextField(
-                  controller: _notesCtrl,
+                  controller: _notesOrSymptomsCtrl,
                   maxLines: 3,
-                  decoration: const InputDecoration(
-                    hintText:
-                        'Optional bedside remarks (e.g. Patient comfortable, afebrile)...',
+                  style: _fieldTextStyle,
+                  decoration: _boxDecoration(
+                    isIpd
+                        ? 'Optional bedside remarks (e.g. Patient comfortable, afebrile)...'
+                        : 'Enter presenting symptoms / chief complaints (e.g. high fever)...',
                   ),
                 ),
               ],
@@ -372,34 +471,107 @@ class _RecordVitalsScreenState extends State<RecordVitalsScreen> {
           16,
           MediaQuery.of(context).padding.bottom + 12,
         ),
-        child: ElevatedButton.icon(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF0F2942),
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 48),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          onPressed: _saving ? null : _saveVitals,
-          icon: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: OutlinedButton(
+                onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: const BorderSide(color: Color(0xFFCBD5E1)),
+                  minimumSize: const Size(0, 46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
                   ),
-                )
-              : const Icon(Icons.check_circle_outline_rounded, size: 19),
-          label: Text(
-            _saving ? 'Saving Vitals...' : 'Save Vitals Observation',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
+                ),
+                child: const Text(
+                  'Cancel',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
             ),
-          ),
+            const SizedBox(width: 10),
+            Expanded(
+              flex: 7,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF026789),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: const Size(0, 46),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+                onPressed: _saving ? null : _saveVitals,
+                icon: _saving
+                    ? const SizedBox(
+                        width: 17,
+                        height: 17,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.save_outlined, size: 18),
+                label: Text(
+                  _saving ? 'Saving...' : 'Save Vitals',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  static const TextStyle _fieldTextStyle = TextStyle(
+    color: AppColors.textPrimary,
+    fontSize: 14,
+    fontWeight: FontWeight.w700,
+  );
+
+  static InputDecoration _boxDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      hintStyle: const TextStyle(
+        color: Color(0xFF94A3B8),
+        fontSize: 13,
+        fontWeight: FontWeight.w500,
+      ),
+      filled: true,
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFFD5DFEC)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: const BorderSide(color: Color(0xFF026789), width: 1.5),
+      ),
+    );
+  }
+}
+
+class _FieldTitle extends StatelessWidget {
+  final String text;
+
+  const _FieldTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: const TextStyle(
+        color: Color(0xFF1E293B),
+        fontSize: 12.5,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
@@ -438,14 +610,12 @@ class _SmallHeaderChip extends StatelessWidget {
 
 class _VitalLabeledInput extends StatelessWidget {
   final String label;
-  final String unit;
   final String hint;
   final TextEditingController controller;
   final TextInputType keyboardType;
 
   const _VitalLabeledInput({
     required this.label,
-    required this.unit,
     required this.hint,
     required this.controller,
     required this.keyboardType,
@@ -456,44 +626,13 @@ class _VitalLabeledInput extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        RichText(
-          text: TextSpan(
-            style: const TextStyle(fontSize: 12.5),
-            children: [
-              TextSpan(
-                text: label,
-                style: const TextStyle(
-                  color: Color(0xFF334155),
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              TextSpan(
-                text: ' ($unit)',
-                style: const TextStyle(
-                  color: Color(0xFF94A3B8),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
+        _FieldTitle(label),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
           keyboardType: keyboardType,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 14.5,
-            fontWeight: FontWeight.w800,
-          ),
-          decoration: InputDecoration(
-            hintText: hint,
-            suffixText: unit,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 11,
-            ),
-          ),
+          style: _RecordVitalsScreenState._fieldTextStyle,
+          decoration: _RecordVitalsScreenState._boxDecoration(hint),
         ),
       ],
     );

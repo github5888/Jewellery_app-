@@ -287,6 +287,59 @@ class ApiClient {
     }
   }
 
+  Future<dynamic> delete(
+    String path, {
+    bool includeAuth = true,
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
+    try {
+      final usingBridge = kIsWeb && AppConfig.webProxyActive;
+      final uri = _buildUri(path);
+      final response = await _http
+          .delete(
+            uri,
+            headers: _headers(
+              includeAuth: includeAuth,
+              jsonContent: false,
+              viaWebBridge: usingBridge,
+            ),
+          )
+          .timeout(timeout);
+      return _decodeResponse(response, triggerAuthCallback: includeAuth);
+    } on TimeoutException {
+      throw const ApiException(
+        message: 'Server took too long to respond. Please try again.',
+      );
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      if (_canFallbackToWebBridge) {
+        try {
+          final bridgeUri = _buildUri(
+            path,
+            overrideBaseUrl: AppConfig.localWebCorsProxyUrl,
+          );
+          final bridgeRes = await _http
+              .delete(
+                bridgeUri,
+                headers: _headers(
+                  includeAuth: includeAuth,
+                  jsonContent: false,
+                  viaWebBridge: true,
+                ),
+              )
+              .timeout(timeout);
+          AppConfig.webProxyActive = true;
+          return _decodeResponse(bridgeRes, triggerAuthCallback: includeAuth);
+        } on ApiException {
+          AppConfig.webProxyActive = true;
+          rethrow;
+        } catch (_) {}
+      }
+      throw _formatNetworkError(e);
+    }
+  }
+
   /// Downloads authenticated clinical reports (`/api/files/pathology_report/*`
   /// and `/api/files/radiology_report/*`) with `Authorization: Bearer <TOKEN>`.
   Future<({Uint8List bytes, String contentType})> downloadAuthenticatedBytes(
