@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:typed_data';
 
 import '../core/config/api_endpoints.dart';
@@ -89,8 +90,127 @@ class NurseApiService {
 
   Future<NurseUser> fetchMe() async {
     final res = await _client.get(endpoints.authMe);
-    final obj = JsonParsers.extractObject(res);
-    return NurseUser.fromJson(obj);
+    final meObj = JsonParsers.extractObject(res);
+    // Also try `/api/auth/profile` if `/api/auth/me` omits extended staff profile fields
+    Map<String, dynamic> merged = meObj;
+    if (!meObj.containsKey('date_of_joining') &&
+        !meObj.containsKey('dateOfJoining') &&
+        !meObj.containsKey('qualification')) {
+      try {
+        final profRes = await _client.get(
+          endpoints.authProfile,
+          timeout: const Duration(seconds: 6),
+        );
+        final profObj = JsonParsers.extractObject(profRes);
+        if (profObj.isNotEmpty) {
+          merged = <String, dynamic>{...profObj, ...meObj};
+        }
+      } catch (_) {}
+    }
+    return NurseUser.fromJson(merged);
+  }
+
+  Future<NurseUser> updateProfile({
+    required String userId,
+    required String name,
+    required String surname,
+    required String email,
+    required String phone,
+    required String emergencyContact,
+    required String gender,
+    required String dob,
+    required String bloodGroup,
+    required String currentAddress,
+    required String permanentAddress,
+    String? image,
+  }) async {
+    final payload = <String, dynamic>{
+      'name': name.trim(),
+      'firstName': name.trim(),
+      'first_name': name.trim(),
+      'surname': surname.trim(),
+      'lastName': surname.trim(),
+      'last_name': surname.trim(),
+      'email': email.trim(),
+      'contact_no': phone.trim(),
+      'contactNo': phone.trim(),
+      'phone': phone.trim(),
+      'mobileno': phone.trim(),
+      'emergency_contact_no': emergencyContact.trim(),
+      'emergencyContactNo': emergencyContact.trim(),
+      'emergency_contact': emergencyContact.trim(),
+      'emergencyContact': emergencyContact.trim(),
+      'gender': gender.trim(),
+      if (dob.trim().isNotEmpty) 'dob': dob.trim(),
+      'blood_group': bloodGroup.trim(),
+      'bloodGroup': bloodGroup.trim(),
+      'local_address': currentAddress.trim(),
+      'localAddress': currentAddress.trim(),
+      'current_address': currentAddress.trim(),
+      'currentAddress': currentAddress.trim(),
+      'permanent_address': permanentAddress.trim(),
+      'permanentAddress': permanentAddress.trim(),
+      if (image != null && image.trim().isNotEmpty) ...{
+        'image': image.trim(),
+        'photo': image.trim(),
+        'avatar': image.trim(),
+      },
+    };
+
+    final candidateUrls = <String>[
+      endpoints.authProfile,
+      endpoints.authMe,
+      endpoints.usersProfile,
+      if (userId.trim().isNotEmpty) endpoints.staffDetail(userId.trim()),
+    ];
+
+    Object? lastError;
+    for (final url in candidateUrls) {
+      try {
+        final res = await _client.put(url, body: payload);
+        final obj = JsonParsers.extractObject(res);
+        if (obj.isNotEmpty) {
+          return NurseUser.fromJson(obj);
+        }
+        return await fetchMe();
+      } on ApiException catch (e) {
+        lastError = e;
+        if (e.statusCode == 404 || e.statusCode == 405) {
+          continue;
+        }
+        rethrow;
+      } catch (e) {
+        lastError = e;
+      }
+    }
+    if (lastError != null) throw lastError;
+    return await fetchMe();
+  }
+
+  Future<String> uploadProfilePhoto({
+    required Uint8List bytes,
+    required String filename,
+    String mimeType = 'image/jpeg',
+  }) async {
+    for (final target in [
+      (url: endpoints.authProfilePhoto, field: 'photo'),
+      (url: endpoints.authAvatar, field: 'avatar'),
+      (url: endpoints.uploads, field: 'file'),
+    ]) {
+      try {
+        final uploadedPath = await _client.uploadMultipartBytes(
+          urlOrPath: target.url,
+          bytes: bytes,
+          filename: filename,
+          fieldName: target.field,
+        );
+        if (uploadedPath.trim().isNotEmpty) {
+          return uploadedPath.trim();
+        }
+      } catch (_) {}
+    }
+    // Fallback to inline data URI when server stores base64 avatar directly on User/Staff document
+    return 'data:$mimeType;base64,${base64Encode(bytes)}';
   }
 
   Future<void> logoutServer() async {
@@ -105,16 +225,37 @@ class NurseApiService {
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,
+    String? confirmPassword,
   }) async {
-    await _client.put(
-      endpoints.authChangePassword,
-      body: <String, dynamic>{
-        'currentPassword': currentPassword,
-        'old_password': currentPassword,
-        'newPassword': newPassword,
-        'new_password': newPassword,
-      },
-    );
+    final confirm = confirmPassword ?? newPassword;
+    final body = <String, dynamic>{
+      'currentPassword': currentPassword,
+      'old_password': currentPassword,
+      'oldPassword': currentPassword,
+      'newPassword': newPassword,
+      'new_password': newPassword,
+      'confirmPassword': confirm,
+      'confirm_password': confirm,
+    };
+
+    Object? lastError;
+    for (final attempt in [
+      () => _client.put(endpoints.authChangePassword, body: body),
+      () => _client.post(endpoints.authChangePassword, body: body),
+      () => _client.put(endpoints.authPasswordAlt, body: body),
+    ]) {
+      try {
+        await attempt();
+        return;
+      } on ApiException catch (e) {
+        lastError = e;
+        if (e.statusCode == 404 || e.statusCode == 405) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+    if (lastError != null) throw lastError;
   }
 
   // ---------------------------------------------------------------------------

@@ -52,7 +52,7 @@ class _SmartHospitalNurseAppState extends State<SmartHospitalNurseApp> {
           return MaterialApp(
             title: 'Smart Super Speciality Hospital - Nurse Portal',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
+            theme: AppTheme.fromPersonalTheme(_controller.personalTheme),
             builder: (ctx, child) {
               // On mobile devices (<= 540px), render 100% native edge-to-edge.
               // On wide desktop browsers (e.g. Chrome on Windows), frame inside a

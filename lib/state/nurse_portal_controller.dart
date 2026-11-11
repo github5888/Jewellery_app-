@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,7 @@ import '../core/config/app_config.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
 import '../core/network/socket_service.dart';
+import '../core/theme/app_theme.dart';
 import '../models/bed_models.dart';
 import '../models/dashboard_data.dart';
 import '../models/duty_roster_model.dart';
@@ -83,6 +85,7 @@ class NursePortalController extends ChangeNotifier {
 
   int _selectedNavIndex = NurseNavIndex.dashboard;
   bool _ipdShowDischarged = false;
+  String _personalThemeId = 'ocean_sapphire';
 
   NursePortalController() {
     _apiClient = ApiClient(
@@ -145,6 +148,157 @@ class NursePortalController extends ChangeNotifier {
 
   int get selectedNavIndex => _selectedNavIndex;
   bool get ipdShowDischarged => _ipdShowDischarged;
+  String get personalThemeId => _personalThemeId;
+  NursePersonalTheme get personalTheme =>
+      NursePersonalTheme.byId(_personalThemeId);
+
+  Future<void> setPersonalTheme(String themeId) async {
+    final resolved = NursePersonalTheme.byId(themeId);
+    _personalThemeId = resolved.id;
+    notifyListeners();
+    await _prefs?.setString(AppConfig.storageKeyPersonalTheme, resolved.id);
+  }
+
+  Future<NurseUser?> refreshCurrentUserProfile() async {
+    try {
+      final fresh = await api.fetchMe();
+      _currentUser = fresh;
+      if (fresh.hospitalInfo != null) {
+        _hospitalInfo = fresh.hospitalInfo!;
+      }
+      await _prefs?.setString(
+        AppConfig.storageKeyCachedUser,
+        jsonEncode(fresh.toJson()),
+      );
+      notifyListeners();
+      return fresh;
+    } catch (_) {
+      return _currentUser;
+    }
+  }
+
+  Future<NurseUser> updateCurrentUserProfile({
+    required String name,
+    required String surname,
+    required String email,
+    required String phone,
+    required String emergencyContact,
+    required String gender,
+    required String dob,
+    required String bloodGroup,
+    required String currentAddress,
+    required String permanentAddress,
+    String? image,
+  }) async {
+    final existing = _currentUser;
+    final updated = await api.updateProfile(
+      userId: existing?.id ?? '',
+      name: name,
+      surname: surname,
+      email: email,
+      phone: phone,
+      emergencyContact: emergencyContact,
+      gender: gender,
+      dob: dob,
+      bloodGroup: bloodGroup,
+      currentAddress: currentAddress,
+      permanentAddress: permanentAddress,
+      image: image ?? existing?.image,
+    );
+
+    final merged = (existing ?? updated).copyWith(
+      name: updated.name.isNotEmpty ? updated.name : name,
+      surname: updated.surname.isNotEmpty ? updated.surname : surname,
+      email: updated.email.isNotEmpty ? updated.email : email,
+      phone: phone,
+      emergencyContact: emergencyContact,
+      gender: gender,
+      dob: updated.dob ?? existing?.dob,
+      dobRaw: dob,
+      bloodGroup: bloodGroup,
+      currentAddress: currentAddress,
+      permanentAddress: permanentAddress,
+      image: image ?? updated.image ?? existing?.image,
+      staffCode: updated.staffCode.isNotEmpty
+          ? updated.staffCode
+          : existing?.staffCode,
+      roleName:
+          updated.roleName.isNotEmpty ? updated.roleName : existing?.roleName,
+      designation: updated.designation.isNotEmpty
+          ? updated.designation
+          : existing?.designation,
+      department: updated.department.isNotEmpty
+          ? updated.department
+          : existing?.department,
+      specialist: updated.specialist.isNotEmpty
+          ? updated.specialist
+          : existing?.specialist,
+      qualification: updated.qualification.isNotEmpty
+          ? updated.qualification
+          : existing?.qualification,
+      dateOfJoining: updated.dateOfJoining ?? existing?.dateOfJoining,
+      dateOfJoiningRaw: updated.dateOfJoiningRaw.isNotEmpty
+          ? updated.dateOfJoiningRaw
+          : existing?.dateOfJoiningRaw,
+      workShift: updated.workShift.isNotEmpty
+          ? updated.workShift
+          : existing?.workShift,
+    );
+
+    _currentUser = merged;
+    await _prefs?.setString(
+      AppConfig.storageKeyCachedUser,
+      jsonEncode(merged.toJson()),
+    );
+    notifyListeners();
+    return merged;
+  }
+
+  Future<void> uploadAndSaveProfilePhoto({
+    Uint8List? bytes,
+    String filename = 'profile.jpg',
+    String mimeType = 'image/jpeg',
+    String? directImageUrl,
+  }) async {
+    String resolvedImage;
+    if (directImageUrl != null && directImageUrl.trim().isNotEmpty) {
+      resolvedImage = directImageUrl.trim();
+    } else if (bytes != null && bytes.isNotEmpty) {
+      resolvedImage = await api.uploadProfilePhoto(
+        bytes: bytes,
+        filename: filename,
+        mimeType: mimeType,
+      );
+    } else {
+      return;
+    }
+
+    final u = _currentUser;
+    if (u != null) {
+      try {
+        await updateCurrentUserProfile(
+          name: u.name,
+          surname: u.surname,
+          email: u.email,
+          phone: u.phone,
+          emergencyContact: u.emergencyContact,
+          gender: u.gender,
+          dob: u.dobDdMmYyyy,
+          bloodGroup: u.bloodGroup,
+          currentAddress: u.currentAddress,
+          permanentAddress: u.permanentAddress,
+          image: resolvedImage,
+        );
+      } catch (_) {
+        _currentUser = u.copyWith(image: resolvedImage);
+        await _prefs?.setString(
+          AppConfig.storageKeyCachedUser,
+          jsonEncode(_currentUser!.toJson()),
+        );
+        notifyListeners();
+      }
+    }
+  }
 
   void setSelectedNavIndex(int index) {
     if (index == NurseNavIndex.ipd) {
@@ -385,6 +539,10 @@ class NursePortalController extends ChangeNotifier {
     notifyListeners();
 
     _prefs = await SharedPreferences.getInstance();
+    final savedTheme = _prefs?.getString(AppConfig.storageKeyPersonalTheme);
+    if (savedTheme != null && savedTheme.trim().isNotEmpty) {
+      _personalThemeId = NursePersonalTheme.byId(savedTheme).id;
+    }
     final savedUrl = _prefs?.getString(AppConfig.storageKeyBaseUrl);
     if (savedUrl != null && savedUrl.trim().isNotEmpty) {
       _baseUrl = AppConfig.normalizeBaseUrl(savedUrl);

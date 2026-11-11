@@ -24,6 +24,8 @@ class AppConfig {
   static const String storageKeyToken = 'smart_hospital_nurse_jwt';
   static const String storageKeyBaseUrl = 'smart_hospital_base_url';
   static const String storageKeyCachedUser = 'smart_hospital_nurse_profile';
+  static const String storageKeyPersonalTheme =
+      'smart_hospital_personal_theme';
 
   static String normalizeBaseUrl(String raw) {
     var trimmed = raw.trim();
@@ -55,11 +57,14 @@ class AppConfig {
     return normalized;
   }
 
-  /// Resolves relative upload paths like `/uploads/patient.jpg` against baseUrl.
+  /// Resolves relative upload paths like `/uploads/patient.jpg` or `data:image/...` against baseUrl.
   static String? resolveMediaUrl(String baseUrl, String? rawPath) {
     if (rawPath == null) return null;
     final clean = rawPath.trim();
     if (clean.isEmpty) return null;
+    if (clean.startsWith('data:image/')) {
+      return clean;
+    }
     final transportBase = effectiveTransportBaseUrl(baseUrl);
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
       if (kIsWeb && webProxyActive) {

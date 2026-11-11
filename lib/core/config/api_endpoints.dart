@@ -21,8 +21,14 @@ class ApiEndpoints {
   // 1. Authentication & Nurse Profile
   String get authLogin => _url('/api/auth/login');
   String get authMe => _url('/api/auth/me');
+  String get authProfile => _url('/api/auth/profile');
+  String get authProfilePhoto => _url('/api/auth/profile/photo');
+  String get authAvatar => _url('/api/auth/avatar');
   String get authLogout => _url('/api/auth/logout');
   String get authChangePassword => _url('/api/auth/change-password');
+  String get authPasswordAlt => _url('/api/auth/password');
+  String get usersProfile => _url('/api/users/profile');
+  String staffDetail(String staffId) => _url('/api/staff/$staffId');
 
   // 2. Nurse Dashboard
   String get dashboard => _url('/api/dashboard');
