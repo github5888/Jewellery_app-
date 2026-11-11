@@ -89,7 +89,11 @@ class ApiEndpoints {
   String get holidayAlt => _url('/api/holiday');
   String get calendar => _url('/api/calendar');
 
-  // 10. Notifications & Protected Report Files
+  // 10. Notifications, Pathology/Radiology & Protected Report Files
+  String get pathology => _url('/api/pathology');
+  String get pathologyBills => _url('/api/pathology/bills');
+  String get radiology => _url('/api/radiology');
+  String get radiologyBills => _url('/api/radiology/bills');
   String get notifications => _url('/api/notifications');
   String notificationRead(String id) => _url('/api/notifications/$id/read');
   String pathologyReportFile(String fileName) =>

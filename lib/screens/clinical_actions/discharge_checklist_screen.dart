@@ -159,56 +159,64 @@ class _DischargeChecklistScreenState extends State<DischargeChecklistScreen> {
             child: Column(
               children: [
                 _CheckItem(
-                  title: 'Handover Completed',
-                  subtitle: 'Shift / attendant clinical handover completed',
+                  title: 'Nursing Handover Completed',
+                  subtitle:
+                      'Clinical handover communicated to receiving nurse or patient guardian',
                   value: _handoverCompleted,
                   onChanged: (v) => setState(() => _handoverCompleted = v),
                 ),
                 _CheckItem(
-                  title: 'IV Cannula Removed',
-                  subtitle: 'Peripheral IV drip cannula safely removed',
+                  title: 'Peripheral IV Line Removed',
+                  subtitle: 'Cannula / IV line removed safely and pressure applied',
                   value: _ivCannulaRemoved,
                   onChanged: (v) => setState(() => _ivCannulaRemoved = v),
                 ),
                 _CheckItem(
-                  title: 'Foley\'s Catheter Removed',
-                  subtitle: 'Urinary catheter safely removed (or N/A verified)',
+                  title: 'Catheter / Drains Removed',
+                  subtitle:
+                      'Urinary catheter and temporary drainage tubes removed if indicated',
                   value: _catheterRemoved,
                   onChanged: (v) => setState(() => _catheterRemoved = v),
                 ),
                 _CheckItem(
-                  title: 'Surgical Drain Removed',
-                  subtitle: 'Drain tube removed & site inspected',
+                  title: 'Surgical Packing Removed',
+                  subtitle:
+                      'All temporary surgical packs or tubes removed and checked',
                   value: _drainRemoved,
                   onChanged: (v) => setState(() => _drainRemoved = v),
                 ),
                 _CheckItem(
-                  title: 'Wound Dressing Clean',
-                  subtitle: 'Fresh sterile wound dressing completed',
+                  title: 'Wound Dressing Clean & Dry',
+                  subtitle:
+                      'Wound inspected, intact and covered with fresh sterile dressing',
                   value: _woundDressingClean,
                   onChanged: (v) => setState(() => _woundDressingClean = v),
                 ),
                 _CheckItem(
-                  title: 'Discharge Medications Explained',
-                  subtitle: 'Home dosage & schedule explained to attendant',
+                  title: 'Medications & Dosage Explained',
+                  subtitle:
+                      'Post-discharge medicines, frequency and food timing explained to patient',
                   value: _medicationsExplained,
                   onChanged: (v) => setState(() => _medicationsExplained = v),
                 ),
                 _CheckItem(
-                  title: 'Belongings & Reports Returned',
-                  subtitle: 'Patient personal belongings & prior reports handed over',
+                  title: 'Patient Belongings Returned',
+                  subtitle:
+                      'Personal valuables, reports and outside films returned',
                   value: _belongingsReturned,
                   onChanged: (v) => setState(() => _belongingsReturned = v),
                 ),
                 _CheckItem(
-                  title: 'Vital Signs Stable',
-                  subtitle: 'BP, Pulse, Temp & SpO2 stable at checkout',
+                  title: 'Pre-Discharge Vitals Stable',
+                  subtitle:
+                      'Final BP, Pulse, SpO2 and Temperature verified within safe limits',
                   value: _vitalSignsStable,
                   onChanged: (v) => setState(() => _vitalSignsStable = v),
                 ),
                 _CheckItem(
-                  title: 'Discharge Slip Handed Over',
-                  subtitle: 'Signed discharge summary provided to family',
+                  title: 'Discharge Summary Slip Handed',
+                  subtitle:
+                      'Printed discharge summary & follow-up schedule explained',
                   value: _dischargeSlipHandedOver,
                   onChanged: (v) =>
                       setState(() => _dischargeSlipHandedOver = v),

@@ -6,9 +6,7 @@ import '../../models/ipd_models.dart';
 import '../../state/nurse_portal_controller.dart';
 import '../../widgets/common_states.dart';
 import '../beds/bed_status_screen.dart';
-import '../medications/medications_mar_screen.dart';
 import '../patients/ipd_patient_detail_screen.dart';
-import '../vitals/record_vitals_screen.dart';
 
 /// Executive Mobile IPD In-Patient Ward Screen (`GET /api/ipd`):
 /// - Studio-lit `PremiumScreenBackground` + `MobileScreenHeader` + `Bed Matrix` capsule
@@ -548,6 +546,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                           builder: (_) => IpdPatientDetailScreen(
                             ipdId: ipd.id,
                             initialAdmission: ipd,
+                            initialTabIndex: 0,
                           ),
                         ),
                       );
@@ -573,7 +572,11 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => RecordVitalsScreen(ipdAdmission: ipd),
+                          builder: (_) => IpdPatientDetailScreen(
+                            ipdId: ipd.id,
+                            initialAdmission: ipd,
+                            initialTabIndex: 1,
+                          ),
                         ),
                       );
                     },
@@ -590,9 +593,11 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => MedicationsMarScreen(
-                            filterIpdId: ipd.id,
-                            patientTitle: ipd.patient.patientName,
+                          builder: (_) => IpdPatientDetailScreen(
+                            ipdId: ipd.id,
+                            initialAdmission: ipd,
+                            initialTabIndex: 2,
+                            initialOrderSubTab: 0,
                           ),
                         ),
                       );

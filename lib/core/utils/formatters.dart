@@ -152,10 +152,43 @@ class AppFormatters {
   }
 
   static String formatCurrencyInr(num amount) {
-    if (amount == amount.roundToDouble()) {
-      return '₹${amount.toInt()}';
+    final isNeg = amount < 0;
+    final absVal = amount.abs();
+    final intPart = absVal.truncate();
+    final frac = absVal - intPart;
+    final formattedInt = _indianGrouping(intPart);
+    final sign = isNeg ? '-' : '';
+    if (frac < 0.005) {
+      return '$sign₹$formattedInt';
     }
-    return '₹${amount.toStringAsFixed(2)}';
+    final decimals = absVal.toStringAsFixed(2).split('.').last;
+    return '$sign₹$formattedInt.$decimals';
+  }
+
+  static String _indianGrouping(int n) {
+    final s = n.toString();
+    if (s.length <= 3) return s;
+    final last3 = s.substring(s.length - 3);
+    var rest = s.substring(0, s.length - 3);
+    final parts = <String>[];
+    while (rest.length > 2) {
+      parts.insert(0, rest.substring(rest.length - 2));
+      rest = rest.substring(0, rest.length - 2);
+    }
+    if (rest.isNotEmpty) parts.insert(0, rest);
+    return '${parts.join(',')},$last3';
+  }
+
+  /// `21/10/2026, 16:01:14` (matches Website IPD Clinical Chart header)
+  static String formatSlashDateTimeWithSeconds(DateTime? dt) {
+    if (dt == null) return '—';
+    final d = dt.toLocal();
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final hh = d.hour.toString().padLeft(2, '0');
+    final min = d.minute.toString().padLeft(2, '0');
+    final ss = d.second.toString().padLeft(2, '0');
+    return '$dd/$mm/${d.year}, $hh:$min:$ss';
   }
 
   static String formatCurrencyTwoDecimals(num amount) {

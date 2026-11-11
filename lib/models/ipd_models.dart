@@ -35,6 +35,10 @@ class PatientProfile {
     required this.abhaAddress,
   });
 
+  String? get photo => image;
+  String get phone => mobileNo;
+  String get ageLabel => age > 0 ? '$age Yrs' : '—';
+
   bool get hasAllergyAlert {
     final cleaned = knownAllergies.trim().toLowerCase();
     return cleaned.isNotEmpty &&
@@ -316,6 +320,7 @@ class MedicationPrescription {
   });
 
   bool get isGiven => status.toLowerCase() == 'given' || status.toLowerCase() == 'administered';
+  bool get isAdministered => isGiven;
   bool get isPending => !isGiven &&
       status.toLowerCase() != 'missed' &&
       status.toLowerCase() != 'refused' &&
@@ -548,22 +553,142 @@ class InvestigationOrder {
     this.reportPdf,
   });
 
-  factory InvestigationOrder.fromJson(Map<String, dynamic> json) {
-    final pdf = JsonParsers.asString(json['report_pdf'] ?? json['attachment'] ?? json['file']);
+  factory InvestigationOrder.fromJson(
+    Map<String, dynamic> json, {
+    String fallbackCategory = 'Lab',
+  }) {
+    final pdf = JsonParsers.asString(
+      json['report_pdf'] ?? json['attachment'] ?? json['file'],
+    );
     return InvestigationOrder(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       testName: JsonParsers.asString(
-        json['test_name'] ?? json['name'] ?? json['investigation_name'] ?? json['title'],
+        json['test_name'] ??
+            json['name'] ??
+            json['investigation_name'] ??
+            json['title'] ??
+            json['bill_no'],
         fallback: 'Diagnostic Test',
       ),
       category: JsonParsers.asString(
         json['category'] ?? json['type'] ?? json['department'],
-        fallback: 'Lab',
+        fallback: fallbackCategory,
       ),
-      status: JsonParsers.asString(json['status'], fallback: 'Ordered'),
-      orderedAt: JsonParsers.asDateTime(json['date'] ?? json['createdAt']),
-      resultSummary: JsonParsers.asString(json['result'] ?? json['finding'] ?? json['notes']),
+      status: JsonParsers.asString(
+        json['status'],
+        fallback: pdf.isNotEmpty ? 'Ready' : 'Ordered',
+      ),
+      orderedAt: JsonParsers.asDateTime(
+        json['date'] ?? json['report_date'] ?? json['createdAt'],
+      ),
+      resultSummary: JsonParsers.asString(
+        json['result'] ?? json['finding'] ?? json['remarks'] ?? json['notes'],
+      ),
       reportPdf: pdf.isEmpty ? null : pdf,
+    );
+  }
+
+  /// Extracts investigations from embedded arrays or pathology/radiology bill objects
+  /// (including nested `tests` arrays used by Smart Hospital MERN).
+  static List<InvestigationOrder> parseBillOrOrderList(
+    dynamic rawList, {
+    String fallbackCategory = 'Lab',
+  }) {
+    final out = <InvestigationOrder>[];
+    for (final item in JsonParsers.asMapList(rawList)) {
+      final parentDate = JsonParsers.asDateTime(
+        item['date'] ?? item['report_date'] ?? item['createdAt'],
+      );
+      final parentPdf = JsonParsers.asString(
+        item['report_pdf'] ?? item['attachment'],
+      );
+      final parentStatus = JsonParsers.asString(item['status']);
+      if (item['tests'] is List) {
+        final nestedTests = JsonParsers.asMapList(item['tests']);
+        if (nestedTests.isNotEmpty) {
+          for (final t in nestedTests) {
+            final tPdf = JsonParsers.asString(
+              t['report_pdf'],
+              fallback: parentPdf,
+            );
+            out.add(
+              InvestigationOrder(
+                id: JsonParsers.asId(t['_id'] ?? item['_id'] ?? item['id']),
+                testName: JsonParsers.asString(
+                  t['test_name'] ?? t['name'] ?? item['test_name'],
+                  fallback: '$fallbackCategory Test',
+                ),
+                category: JsonParsers.asString(
+                  t['category'] ?? item['category'],
+                  fallback: fallbackCategory,
+                ),
+                status: JsonParsers.asString(
+                  t['status'] ?? parentStatus,
+                  fallback: tPdf.isNotEmpty ? 'Ready' : 'Ordered',
+                ),
+                orderedAt: JsonParsers.asDateTime(t['report_date']) ?? parentDate,
+                resultSummary: JsonParsers.asString(
+                  t['result'] ?? t['finding'] ?? t['remarks'] ?? item['note'],
+                ),
+                reportPdf: tPdf.isEmpty ? null : tPdf,
+              ),
+            );
+          }
+          continue;
+        }
+      }
+      out.add(
+        InvestigationOrder.fromJson(item, fallbackCategory: fallbackCategory),
+      );
+    }
+    return out;
+  }
+}
+
+/// Bed Transfer History Entry (`bed_history` / `bed_transfers` on IPD chart)
+class BedTransferHistoryEntry {
+  final String id;
+  final String fromBed;
+  final String toBed;
+  final String wardGroup;
+  final String reason;
+  final String transferredBy;
+  final DateTime? date;
+
+  const BedTransferHistoryEntry({
+    required this.id,
+    required this.fromBed,
+    required this.toBed,
+    required this.wardGroup,
+    required this.reason,
+    required this.transferredBy,
+    this.date,
+  });
+
+  factory BedTransferHistoryEntry.fromJson(Map<String, dynamic> json) {
+    return BedTransferHistoryEntry(
+      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      fromBed: JsonParsers.asString(
+        json['from_bed'] ?? json['previous_bed'] ?? json['old_bed'],
+      ),
+      toBed: JsonParsers.asString(
+        json['to_bed'] ?? json['bed'] ?? json['new_bed'] ?? json['bed_name'],
+      ),
+      wardGroup: JsonParsers.asString(
+        json['bed_group'] ?? json['ward'] ?? json['ward_group'],
+      ),
+      reason: JsonParsers.asString(
+        json['transfer_reason'] ?? json['reason'] ?? json['note'],
+      ),
+      transferredBy: JsonParsers.asString(
+        json['transferred_by'] ?? json['updated_by'] ?? json['staff_name'],
+      ),
+      date: JsonParsers.asDateTime(
+        json['transfer_date'] ??
+            json['from_date'] ??
+            json['date'] ??
+            json['createdAt'],
+      ),
     );
   }
 }
@@ -663,15 +788,52 @@ class DischargeChecklist {
   factory DischargeChecklist.fromJson(Map<String, dynamic> json) {
     return DischargeChecklist(
       handoverCompleted: JsonParsers.asBool(json['handover_completed']),
-      ivCannulaRemoved: JsonParsers.asBool(json['iv_cannula_removed']),
+      ivCannulaRemoved: JsonParsers.asBool(
+        json['iv_cannula_removed'] ?? json['peripheral_iv_removed'],
+      ),
       catheterRemoved: JsonParsers.asBool(json['catheter_removed']),
-      drainRemoved: JsonParsers.asBool(json['drain_removed']),
+      drainRemoved: JsonParsers.asBool(
+        json['drain_removed'] ?? json['surgical_packing_removed'],
+      ),
       woundDressingClean: JsonParsers.asBool(json['wound_dressing_clean']),
       medicationsExplained: JsonParsers.asBool(json['medications_explained']),
       belongingsReturned: JsonParsers.asBool(json['belongings_returned']),
-      vitalSignsStable: JsonParsers.asBool(json['vital_signs_stable']),
-      dischargeSlipHandedOver: JsonParsers.asBool(json['discharge_slip_handed_over']),
-      checklistNotes: JsonParsers.asString(json['checklist_notes']),
+      vitalSignsStable: JsonParsers.asBool(
+        json['vital_signs_stable'] ?? json['pre_discharge_vitals_stable'],
+      ),
+      dischargeSlipHandedOver: JsonParsers.asBool(
+        json['discharge_slip_handed_over'] ?? json['discharge_summary_handed'],
+      ),
+      checklistNotes: JsonParsers.asString(
+        json['checklist_notes'] ?? json['notes'],
+      ),
+    );
+  }
+
+  DischargeChecklist copyWith({
+    bool? handoverCompleted,
+    bool? ivCannulaRemoved,
+    bool? catheterRemoved,
+    bool? drainRemoved,
+    bool? woundDressingClean,
+    bool? medicationsExplained,
+    bool? belongingsReturned,
+    bool? vitalSignsStable,
+    bool? dischargeSlipHandedOver,
+    String? checklistNotes,
+  }) {
+    return DischargeChecklist(
+      handoverCompleted: handoverCompleted ?? this.handoverCompleted,
+      ivCannulaRemoved: ivCannulaRemoved ?? this.ivCannulaRemoved,
+      catheterRemoved: catheterRemoved ?? this.catheterRemoved,
+      drainRemoved: drainRemoved ?? this.drainRemoved,
+      woundDressingClean: woundDressingClean ?? this.woundDressingClean,
+      medicationsExplained: medicationsExplained ?? this.medicationsExplained,
+      belongingsReturned: belongingsReturned ?? this.belongingsReturned,
+      vitalSignsStable: vitalSignsStable ?? this.vitalSignsStable,
+      dischargeSlipHandedOver:
+          dischargeSlipHandedOver ?? this.dischargeSlipHandedOver,
+      checklistNotes: checklistNotes ?? this.checklistNotes,
     );
   }
 
@@ -680,6 +842,7 @@ class DischargeChecklist {
         'iv_cannula_removed': ivCannulaRemoved,
         'catheter_removed': catheterRemoved,
         'drain_removed': drainRemoved,
+        'surgical_packing_removed': drainRemoved,
         'wound_dressing_clean': woundDressingClean,
         'medications_explained': medicationsExplained,
         'belongings_returned': belongingsReturned,
@@ -703,10 +866,15 @@ class IpdAdmission {
   final String bedGroup;
   final String admissionType;
   final String provisionalDiagnosis;
+  final String presentingComplaint;
+  final String referringDoctor;
   final String department;
   final String attendantName;
   final String attendantPhone;
   final String attendantRelation;
+  final String payerType;
+  final String tpaInsurance;
+  final double creditLimit;
   final bool isCasualty;
   final bool isAntenatal;
   final double outstandingDue;
@@ -719,6 +887,7 @@ class IpdAdmission {
   final List<DoctorRoundInstruction> consultantRegister;
   final List<InvestigationOrder> investigations;
   final List<NursingProcedureCharge> charges;
+  final List<BedTransferHistoryEntry> bedTransferHistory;
   final DischargeChecklist dischargeChecklist;
 
   const IpdAdmission({
@@ -734,10 +903,15 @@ class IpdAdmission {
     required this.bedGroup,
     required this.admissionType,
     required this.provisionalDiagnosis,
+    this.presentingComplaint = '',
+    this.referringDoctor = '',
     required this.department,
     required this.attendantName,
     required this.attendantPhone,
     required this.attendantRelation,
+    this.payerType = 'Self-pay',
+    this.tpaInsurance = 'None',
+    this.creditLimit = 0.0,
     required this.isCasualty,
     required this.isAntenatal,
     this.outstandingDue = 0.0,
@@ -749,8 +923,51 @@ class IpdAdmission {
     required this.consultantRegister,
     required this.investigations,
     required this.charges,
+    this.bedTransferHistory = const [],
     required this.dischargeChecklist,
   });
+
+  IpdAdmission copyWith({
+    List<InvestigationOrder>? investigations,
+    DischargeChecklist? dischargeChecklist,
+  }) {
+    return IpdAdmission(
+      id: id,
+      ipdNo: ipdNo,
+      caseReferenceId: caseReferenceId,
+      admissionDate: admissionDate,
+      dischargeDate: dischargeDate,
+      dischargeStatus: dischargeStatus,
+      isDischargedFlag: isDischargedFlag,
+      bed: bed,
+      bedId: bedId,
+      bedGroup: bedGroup,
+      admissionType: admissionType,
+      provisionalDiagnosis: provisionalDiagnosis,
+      presentingComplaint: presentingComplaint,
+      referringDoctor: referringDoctor,
+      department: department,
+      attendantName: attendantName,
+      attendantPhone: attendantPhone,
+      attendantRelation: attendantRelation,
+      payerType: payerType,
+      tpaInsurance: tpaInsurance,
+      creditLimit: creditLimit,
+      isCasualty: isCasualty,
+      isAntenatal: isAntenatal,
+      outstandingDue: outstandingDue,
+      patient: patient,
+      doctor: doctor,
+      vitals: vitals,
+      prescriptions: prescriptions,
+      nurseNotes: nurseNotes,
+      consultantRegister: consultantRegister,
+      investigations: investigations ?? this.investigations,
+      charges: charges,
+      bedTransferHistory: bedTransferHistory,
+      dischargeChecklist: dischargeChecklist ?? this.dischargeChecklist,
+    );
+  }
 
   /// Accurately detects whether an IPD record is discharged across all backend conventions:
   /// `discharge_status` ('discharged' / 'yes'), `status` ('Discharged'), `is_discharged` (true), or `discharge_date`.
@@ -869,13 +1086,31 @@ class IpdAdmission {
         .map(DoctorRoundInstruction.fromJson)
         .toList();
 
-    final investigations = JsonParsers.asMapList(json['investigations'])
-        .map(InvestigationOrder.fromJson)
-        .toList();
+    final investigations = <InvestigationOrder>[
+      ...InvestigationOrder.parseBillOrOrderList(
+        json['investigations'] ?? json['lab_investigations'] ?? json['diagnostics'],
+        fallbackCategory: 'Lab',
+      ),
+      ...InvestigationOrder.parseBillOrOrderList(
+        json['pathology_orders'] ?? json['pathology_bills'] ?? json['pathology'],
+        fallbackCategory: 'Pathology',
+      ),
+      ...InvestigationOrder.parseBillOrOrderList(
+        json['radiology_orders'] ?? json['radiology_bills'] ?? json['radiology'],
+        fallbackCategory: 'Radiology',
+      ),
+    ];
 
     final charges = JsonParsers.asMapList(json['charges'])
         .map(NursingProcedureCharge.fromJson)
         .toList();
+
+    final bedTransferHistory = JsonParsers.asMapList(
+      json['bed_history'] ??
+          json['bed_transfers'] ??
+          json['transfers'] ??
+          json['bedHistory'],
+    ).map(BedTransferHistoryEntry.fromJson).toList();
 
     final checklistMap = json['discharge_checklist'] is Map
         ? JsonParsers.asMap(json['discharge_checklist'])
@@ -908,6 +1143,20 @@ class IpdAdmission {
       );
       if (totalBill > paid) computedDue = totalBill - paid;
     }
+
+    final rawTpa = JsonParsers.asString(
+      json['tpa'] ??
+          json['tpa_name'] ??
+          json['tpaName'] ??
+          json['organisation_name'] ??
+          json['insurance'],
+    );
+    final rawPayerType = JsonParsers.asString(
+      json['payer_type'] ?? json['payerType'] ?? json['payment_mode'],
+      fallback: rawTpa.isNotEmpty && rawTpa.toLowerCase() != 'none'
+          ? 'TPA / Insurance'
+          : 'Self-pay',
+    );
 
     return IpdAdmission(
       id: id,
@@ -942,8 +1191,23 @@ class IpdAdmission {
       provisionalDiagnosis: JsonParsers.asString(
         json['provisional_diagnosis'] ??
             json['provisionalDiagnosis'] ??
-            json['diagnosis'] ??
-            json['symptoms'],
+            json['diagnosis'],
+      ),
+      presentingComplaint: JsonParsers.asString(
+        json['presenting_complaint'] ??
+            json['presentingComplaint'] ??
+            json['symptoms'] ??
+            json['symptoms_description'] ??
+            json['symptoms_title'] ??
+            json['reason'] ??
+            json['note'],
+      ),
+      referringDoctor: JsonParsers.asString(
+        json['referring_doctor'] ??
+            json['refference'] ??
+            json['reference'] ??
+            json['referred_by'],
+        fallback: 'Self / Hospital OPD',
       ),
       department: JsonParsers.asString(
         json['department'],
@@ -956,7 +1220,12 @@ class IpdAdmission {
         json['attendant_phone'] ?? json['attendantPhone'],
       ),
       attendantRelation: JsonParsers.asString(
-        json['attendant_relation'] ?? json['attendantRelation'],
+        json['attendant_relation'] ?? json['attendantRelation'] ?? json['relation'],
+      ),
+      payerType: rawPayerType,
+      tpaInsurance: rawTpa.isEmpty ? 'None' : rawTpa,
+      creditLimit: JsonParsers.asDouble(
+        json['credit_limit'] ?? json['creditLimit'],
       ),
       isCasualty: JsonParsers.asBool(json['casualty'] ?? json['is_casualty']),
       isAntenatal: JsonParsers.asBool(
@@ -971,6 +1240,7 @@ class IpdAdmission {
       consultantRegister: consultantRegister,
       investigations: investigations,
       charges: charges,
+      bedTransferHistory: bedTransferHistory,
       dischargeChecklist: DischargeChecklist.fromJson(checklistMap),
     );
   }

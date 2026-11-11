@@ -446,7 +446,91 @@ class NurseApiService {
 
   Future<IpdAdmission> fetchIpdPatientDetail(String ipdId) async {
     final res = await _client.get(endpoints.ipdDetail(ipdId));
-    return IpdAdmission.fromJson(JsonParsers.asMap(res));
+    final admission = IpdAdmission.fromJson(JsonParsers.asMap(res));
+    if (admission.investigations.isNotEmpty) {
+      return admission;
+    }
+
+    // Also pull linked Pathology & Radiology investigations (matches Website IPD Chart `Investigations (N)`).
+    try {
+      final results = await Future.wait<List<InvestigationOrder>>([
+        _fetchPatientInvestigationsFromEndpoints(
+          urls: [endpoints.pathology, endpoints.pathologyBills],
+          admission: admission,
+          category: 'Pathology',
+        ),
+        _fetchPatientInvestigationsFromEndpoints(
+          urls: [endpoints.radiology, endpoints.radiologyBills],
+          admission: admission,
+          category: 'Radiology',
+        ),
+      ]);
+      final merged = <InvestigationOrder>[...results[0], ...results[1]];
+      if (merged.isNotEmpty) {
+        return admission.copyWith(investigations: merged);
+      }
+    } catch (_) {}
+
+    return admission;
+  }
+
+  Future<List<InvestigationOrder>> _fetchPatientInvestigationsFromEndpoints({
+    required List<String> urls,
+    required IpdAdmission admission,
+    required String category,
+  }) async {
+    for (final url in urls) {
+      try {
+        final raw = await _client.get(url);
+        final list = JsonParsers.extractList(
+          raw,
+          candidateKeys: const ['bills', 'orders', 'records', 'items', 'data'],
+        );
+        if (list.isEmpty) continue;
+        final matched = list.where((m) => _matchesAdmissionOrder(m, admission)).toList();
+        return InvestigationOrder.parseBillOrOrderList(
+          matched,
+          fallbackCategory: category,
+        );
+      } catch (_) {
+        // Try next candidate URL
+      }
+    }
+    return const [];
+  }
+
+  bool _matchesAdmissionOrder(Map<String, dynamic> item, IpdAdmission ipd) {
+    final itemIpdId = JsonParsers.asId(item['ipd_id'] ?? item['ipd']);
+    if (ipd.id.isNotEmpty && itemIpdId == ipd.id) return true;
+
+    final itemIpdNo = JsonParsers.asString(item['ipd_no']).trim().toLowerCase();
+    if (ipd.ipdNo.isNotEmpty && itemIpdNo == ipd.ipdNo.trim().toLowerCase()) {
+      return true;
+    }
+
+    final itemCase = JsonParsers.asString(
+      item['case_reference_id'] ?? item['case_id'],
+    ).trim().toLowerCase();
+    if (ipd.caseReferenceId.isNotEmpty &&
+        itemCase == ipd.caseReferenceId.trim().toLowerCase()) {
+      return true;
+    }
+
+    final patMap = item['patient'] is Map
+        ? JsonParsers.asMap(item['patient'])
+        : <String, dynamic>{};
+    final itemPatId = JsonParsers.asId(item['patient_id'] ?? patMap['_id'] ?? patMap['id']);
+    if (ipd.patient.id.isNotEmpty && itemPatId == ipd.patient.id) return true;
+
+    final itemUhid = JsonParsers.asString(
+      item['patient_unique_id'] ?? patMap['patient_unique_id'] ?? item['uhid'],
+    ).trim().toLowerCase();
+    if (ipd.patient.patientUniqueId.isNotEmpty &&
+        itemUhid == ipd.patient.patientUniqueId.trim().toLowerCase()) {
+      return true;
+    }
+
+    return false;
   }
 
   Future<void> recordIpdVitals({

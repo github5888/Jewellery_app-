@@ -1554,6 +1554,7 @@ class _PremiumBedsidePatientCard extends StatelessWidget {
                           builder: (_) => IpdPatientDetailScreen(
                             ipdId: ipd.id,
                             initialAdmission: ipd,
+                            initialTabIndex: 0,
                           ),
                         ),
                       );
@@ -1579,7 +1580,11 @@ class _PremiumBedsidePatientCard extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => RecordVitalsScreen(ipdAdmission: ipd),
+                          builder: (_) => IpdPatientDetailScreen(
+                            ipdId: ipd.id,
+                            initialAdmission: ipd,
+                            initialTabIndex: 1,
+                          ),
                         ),
                       );
                     },
@@ -1596,9 +1601,11 @@ class _PremiumBedsidePatientCard extends StatelessWidget {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => MedicationsMarScreen(
-                            filterIpdId: ipd.id,
-                            patientTitle: ipd.patient.patientName,
+                          builder: (_) => IpdPatientDetailScreen(
+                            ipdId: ipd.id,
+                            initialAdmission: ipd,
+                            initialTabIndex: 2,
+                            initialOrderSubTab: 0,
                           ),
                         ),
                       );
