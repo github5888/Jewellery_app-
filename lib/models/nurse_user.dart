@@ -406,7 +406,7 @@ class NurseUser {
         source['dateOfBirth'] ??
         source['date_of_birth'] ??
         staffSub['dob'];
-    final parsedDob = JsonParsers.asDateTime(rawDobVal);
+    final parsedDob = JsonParsers.asCalendarDate(rawDobVal);
     final rawDobStr = JsonParsers.asString(rawDobVal);
 
     final rawDojVal = source['date_of_joining'] ??
@@ -415,7 +415,7 @@ class NurseUser {
         source['joiningDate'] ??
         staffSub['date_of_joining'] ??
         staffSub['dateOfJoining'];
-    final parsedDoj = JsonParsers.asDateTime(rawDojVal);
+    final parsedDoj = JsonParsers.asCalendarDate(rawDojVal);
     final rawDojStr = JsonParsers.asString(rawDojVal);
 
     return NurseUser(

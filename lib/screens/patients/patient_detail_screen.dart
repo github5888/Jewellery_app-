@@ -1614,7 +1614,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       ('Age:', p.age > 0 ? '${p.age} Years' : '-'),
       (
         'Date of Birth:',
-        p.dob != null ? AppFormatters.formatSlashDate(p.dob) : '-',
+        p.formattedDobSlash.isNotEmpty ? p.formattedDobSlash : '-',
       ),
     ];
 

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/formatters.dart';
 import '../../core/utils/print_helper.dart';
 import '../../models/patient_directory_model.dart';
 import '../../state/nurse_portal_controller.dart';
@@ -89,6 +88,7 @@ class _PatientAbhaDialogState extends State<_PatientAbhaDialog> {
       setState(() {
         _patient = fresh;
         _loadingCard = false;
+        _wasUpdated = true;
         if (fresh.phone.isNotEmpty && _mobileController.text.trim().isEmpty) {
           _mobileController.text = fresh.phone;
         }
@@ -98,7 +98,6 @@ class _PatientAbhaDialogState extends State<_PatientAbhaDialog> {
         }
         if (!hadAbhaBefore && fresh.hasAbha) {
           _showCardView = true;
-          _wasUpdated = true;
         }
       });
     } catch (_) {
@@ -181,12 +180,7 @@ class _PatientAbhaDialogState extends State<_PatientAbhaDialog> {
     return m;
   }
 
-  String get _dobDisplay {
-    if (_patient.dob != null) {
-      return AppFormatters.formatSlashDate(_patient.dob);
-    }
-    return '—';
-  }
+  String get _dobDisplay => _patient.formattedAbhaDobSlash;
 
   String get _qrPayload {
     return jsonEncode(<String, String>{

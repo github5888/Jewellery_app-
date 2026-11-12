@@ -267,12 +267,13 @@ class BloodDonorRecord {
   });
 
   factory BloodDonorRecord.fromJson(Map<String, dynamic> json) {
-    final dob = JsonParsers.asDateTime(
+    final dob = JsonParsers.asCalendarDate(
       json['dob'] ?? json['date_of_birth'] ?? json['dateOfBirth'],
     );
     int parsedAge = JsonParsers.asInt(json['age']);
     if (parsedAge <= 0 && dob != null) {
-      parsedAge = ((DateTime.now().difference(dob).inDays) / 365.25).floor();
+      parsedAge = DateTime.now().year - dob.year;
+      if (parsedAge < 0) parsedAge = 0;
     }
     return BloodDonorRecord(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
@@ -378,7 +379,7 @@ class HospitalHolidayItem {
         json['type'] ?? json['holiday_type'] ?? json['holidayType'],
         fallback: 'Holiday',
       ),
-      fromDate: JsonParsers.asDateTime(
+      fromDate: JsonParsers.asCalendarDate(
         json['from_date'] ??
             json['fromDate'] ??
             json['date'] ??
@@ -386,7 +387,7 @@ class HospitalHolidayItem {
             json['startDate'] ??
             json['holiday_date'],
       ),
-      toDate: JsonParsers.asDateTime(
+      toDate: JsonParsers.asCalendarDate(
         json['to_date'] ?? json['toDate'] ?? json['end_date'],
       ),
       createdBy: createdByStr,

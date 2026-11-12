@@ -56,10 +56,11 @@ class PatientProfile {
     final rawImg = JsonParsers.asString(
       json['image'] ?? json['photo'] ?? fallbackParent['patient_image'],
     );
-    final dob = JsonParsers.asDateTime(json['dob'] ?? fallbackParent['dob']);
+    final dob = JsonParsers.asCalendarDate(json['dob'] ?? fallbackParent['dob']);
     int age = JsonParsers.asInt(json['age'] ?? fallbackParent['age']);
     if (age <= 0 && dob != null) {
-      age = ((DateTime.now().difference(dob).inDays) / 365.25).floor();
+      age = DateTime.now().year - dob.year;
+      if (age < 0) age = 0;
     }
 
     return PatientProfile(

@@ -87,6 +87,80 @@ class JsonParsers {
     return fallback;
   }
 
+  static DateTime? _parseSlashOrDashParts(String raw) {
+    final dateOnly = raw.contains('T')
+        ? raw.split('T').first.trim()
+        : raw.split(' ').first.trim();
+    final sep = dateOnly.contains('/')
+        ? '/'
+        : (dateOnly.contains('-') ? '-' : '');
+    if (sep.isEmpty) return null;
+    final parts = dateOnly.split(sep);
+    if (parts.length != 3) return null;
+    final p0 = int.tryParse(parts[0]);
+    final p1 = int.tryParse(parts[1]);
+    final p2 = int.tryParse(parts[2]);
+    if (p0 == null || p1 == null || p2 == null) return null;
+    // YYYY-MM-DD or YYYY/MM/DD
+    if (p0 > 1900 && p1 >= 1 && p1 <= 12 && p2 >= 1 && p2 <= 31) {
+      return DateTime(p0, p1, p2);
+    }
+    // DD-MM-YYYY or DD/MM/YYYY
+    if (p2 > 1900 && p1 >= 1 && p1 <= 12 && p0 >= 1 && p0 <= 31) {
+      return DateTime(p2, p1, p0);
+    }
+    return null;
+  }
+
+  /// Parses calendar-only dates (`dob`, `date_of_joining`, `holiday`, `roster.date`)
+  /// using the exact calendar day from the server string (`YYYY-MM-DD`, `YYYY-MM-DDTHH:mm:ssZ`,
+  /// `DD/MM/YYYY`, or `DD-MM-YYYY`) without shifting across midnight due to local timezone offsets.
+  static DateTime? asCalendarDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return DateTime(value.year, value.month, value.day);
+    if (value is int) {
+      final dt = DateTime.fromMillisecondsSinceEpoch(
+        value < 10000000000 ? value * 1000 : value,
+        isUtc: true,
+      );
+      return DateTime(dt.year, dt.month, dt.day);
+    }
+    if (value is String) {
+      final trimmed = value.trim();
+      if (trimmed.isEmpty) return null;
+      final lower = trimmed.toLowerCase();
+      if (lower == 'null' || lower == 'undefined' || lower == 'n/a') {
+        return null;
+      }
+      final exact = _parseSlashOrDashParts(trimmed);
+      if (exact != null) return exact;
+      final direct = DateTime.tryParse(trimmed);
+      if (direct != null) {
+        return DateTime(direct.year, direct.month, direct.day);
+      }
+    }
+    return null;
+  }
+
+  /// Formats any raw calendar date string (`1994-12-31T18:30:00.000Z`, `1994-12-31`,
+  /// `31-12-1994`, `31/12/1994`, or year `1994`) into `DD/MM/YYYY` matching the React web portal.
+  static String formatCalendarSlash(dynamic value, {String fallback = ''}) {
+    if (value == null) return fallback;
+    final parsed = asCalendarDate(value);
+    if (parsed != null) {
+      final dd = parsed.day.toString().padLeft(2, '0');
+      final mm = parsed.month.toString().padLeft(2, '0');
+      return '$dd/$mm/${parsed.year}';
+    }
+    final raw = asString(value);
+    if (raw.isEmpty) return fallback;
+    final lower = raw.toLowerCase();
+    if (lower == 'null' || lower == 'undefined' || lower == 'none') {
+      return fallback;
+    }
+    return raw;
+  }
+
   static DateTime? asDateTime(dynamic value) {
     if (value == null) return null;
     if (value is DateTime) return value;
@@ -100,16 +174,8 @@ class JsonParsers {
       if (trimmed.isEmpty) return null;
       final direct = DateTime.tryParse(trimmed);
       if (direct != null) return direct.toLocal();
-      // Support DD/MM/YYYY format if returned by formatted endpoints
-      final slashParts = trimmed.split('/');
-      if (slashParts.length == 3) {
-        final d = int.tryParse(slashParts[0]);
-        final m = int.tryParse(slashParts[1]);
-        final y = int.tryParse(slashParts[2].split(' ').first);
-        if (d != null && m != null && y != null && y > 1900) {
-          return DateTime(y, m, d);
-        }
-      }
+      final partsDt = _parseSlashOrDashParts(trimmed);
+      if (partsDt != null) return partsDt;
     }
     return null;
   }

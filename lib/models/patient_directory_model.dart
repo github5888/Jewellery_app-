@@ -10,6 +10,8 @@ class PatientDirectoryRecord {
   final String patientName;
   final int age;
   final DateTime? dob;
+  final String dobRaw;
+  final String abhaDob;
   final String gender;
   final String bloodGroup;
   final String phone;
@@ -34,6 +36,8 @@ class PatientDirectoryRecord {
     required this.patientName,
     required this.age,
     this.dob,
+    this.dobRaw = '',
+    this.abhaDob = '',
     required this.gender,
     required this.bloodGroup,
     required this.phone,
@@ -58,12 +62,32 @@ class PatientDirectoryRecord {
   bool get hasAbha =>
       abhaNumber.trim().isNotEmpty || abhaAddress.trim().isNotEmpty;
 
+  String get formattedDobSlash {
+    final primary = JsonParsers.formatCalendarSlash(
+      dobRaw.trim().isNotEmpty ? dobRaw : dob,
+    );
+    if (primary.isNotEmpty) return primary;
+    return JsonParsers.formatCalendarSlash(abhaDob);
+  }
+
+  String get formattedAbhaDobSlash {
+    final fromAbha = JsonParsers.formatCalendarSlash(abhaDob);
+    if (fromAbha.isNotEmpty) return fromAbha;
+    final fromPatient = JsonParsers.formatCalendarSlash(
+      dobRaw.trim().isNotEmpty ? dobRaw : dob,
+    );
+    if (fromPatient.isNotEmpty) return fromPatient;
+    return '—';
+  }
+
   PatientDirectoryRecord copyWith({
     String? id,
     String? patientUniqueId,
     String? patientName,
     int? age,
     DateTime? dob,
+    String? dobRaw,
+    String? abhaDob,
     String? gender,
     String? bloodGroup,
     String? phone,
@@ -88,6 +112,8 @@ class PatientDirectoryRecord {
       patientName: patientName ?? this.patientName,
       age: age ?? this.age,
       dob: dob ?? this.dob,
+      dobRaw: dobRaw ?? this.dobRaw,
+      abhaDob: abhaDob ?? this.abhaDob,
       gender: gender ?? this.gender,
       bloodGroup: bloodGroup ?? this.bloodGroup,
       phone: phone ?? this.phone,
@@ -131,16 +157,53 @@ class PatientDirectoryRecord {
     final img = JsonParsers.asString(
       json['image'] ?? json['photo'] ?? abhaObj['photo'],
     );
-    final dob = JsonParsers.asDateTime(
-      json['dob'] ??
-          json['date_of_birth'] ??
-          json['dateOfBirth'] ??
+
+    String buildSplitAbhaDob(Map<String, dynamic> src) {
+      final y = JsonParsers.asString(
+        src['yearOfBirth'] ?? src['year_of_birth'],
+      );
+      if (y.isEmpty) return '';
+      final m = JsonParsers.asString(
+        src['monthOfBirth'] ?? src['month_of_birth'],
+      );
+      final d = JsonParsers.asString(
+        src['dayOfBirth'] ?? src['day_of_birth'],
+      );
+      if (d.isNotEmpty && m.isNotEmpty) {
+        return '${d.padLeft(2, '0')}/${m.padLeft(2, '0')}/$y';
+      }
+      return y;
+    }
+
+    final rawAbhaDobStr = JsonParsers.asString(
+      json['abha_dob'] ??
+          json['abhaDob'] ??
           abhaObj['dob'] ??
-          abhaObj['dateOfBirth'],
+          abhaObj['dateOfBirth'] ??
+          abhaObj['date_of_birth'],
+      fallback: buildSplitAbhaDob(abhaObj.isNotEmpty ? abhaObj : json),
     );
+
+    final rawPatientDobVal = json['dob'] ??
+        json['date_of_birth'] ??
+        json['dateOfBirth'] ??
+        (rawAbhaDobStr.isNotEmpty ? rawAbhaDobStr : null);
+    final rawPatientDobStr = JsonParsers.asString(rawPatientDobVal);
+    final dob = JsonParsers.asCalendarDate(rawPatientDobVal);
+
     int age = JsonParsers.asInt(json['age'] ?? json['age_years']);
     if (age <= 0 && dob != null) {
-      age = ((DateTime.now().difference(dob).inDays) / 365.25).floor();
+      age = DateTime.now().year - dob.year;
+      if (age < 0) age = 0;
+    }
+
+    String normalizeGender(String rawG) {
+      final g = rawG.trim();
+      final low = g.toLowerCase();
+      if (low == 'm' || low == 'male') return 'Male';
+      if (low == 'f' || low == 'female') return 'Female';
+      if (low == 'o' || low == 'other') return 'Other';
+      return g.isEmpty ? '—' : g;
     }
 
     bool disabled = false;
@@ -212,9 +275,10 @@ class PatientDirectoryRecord {
       patientName: combined.isNotEmpty ? combined : '—',
       age: age,
       dob: dob,
-      gender: JsonParsers.asString(
-        json['gender'] ?? abhaObj['gender'],
-        fallback: '—',
+      dobRaw: rawPatientDobStr,
+      abhaDob: rawAbhaDobStr,
+      gender: normalizeGender(
+        JsonParsers.asString(json['gender'] ?? abhaObj['gender']),
       ),
       bloodGroup: JsonParsers.asString(
         json['blood_group'] ?? json['bloodGroup'],

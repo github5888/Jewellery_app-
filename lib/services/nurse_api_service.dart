@@ -529,10 +529,46 @@ class NurseApiService {
   // ---------------------------------------------------------------------------
 
   Future<List<PatientDirectoryRecord>> fetchPatientDirectory() async {
-    final res = await _client.get(endpoints.patients);
-    return JsonParsers.extractList(res)
+    final results = await Future.wait<dynamic>([
+      _client.get(endpoints.patients),
+      _client
+          .get(endpoints.abha, timeout: const Duration(seconds: 6))
+          .catchError((_) => null),
+    ]);
+    final patients = JsonParsers.extractList(results[0])
         .map(PatientDirectoryRecord.fromJson)
         .toList();
+
+    final abhaRaw = results[1];
+    if (abhaRaw == null) return patients;
+    final abhaItems = JsonParsers.extractList(abhaRaw);
+    if (abhaItems.isEmpty) return patients;
+
+    return patients.map((p) {
+      for (final a in abhaItems) {
+        if (_matchesPatientRecord(a, p)) {
+          final parsedAbha = PatientDirectoryRecord.fromJson(a);
+          if (parsedAbha.hasAbha || parsedAbha.abhaDob.isNotEmpty) {
+            return p.copyWith(
+              abhaNumber: parsedAbha.abhaNumber.isNotEmpty
+                  ? parsedAbha.abhaNumber
+                  : p.abhaNumber,
+              abhaAddress: parsedAbha.abhaAddress.isNotEmpty
+                  ? parsedAbha.abhaAddress
+                  : p.abhaAddress,
+              abhaDob: parsedAbha.abhaDob.isNotEmpty
+                  ? parsedAbha.abhaDob
+                  : (parsedAbha.dobRaw.isNotEmpty
+                      ? parsedAbha.dobRaw
+                      : p.abhaDob),
+              dob: p.dob ?? parsedAbha.dob,
+              dobRaw: p.dobRaw.isNotEmpty ? p.dobRaw : parsedAbha.dobRaw,
+            );
+          }
+        }
+      }
+      return p;
+    }).toList();
   }
 
   Future<PatientDirectoryRecord> fetchPatientDetail(String patientId) async {
@@ -841,6 +877,11 @@ class NurseApiService {
                 : basePatient.patientName,
             phone: fetched.phone.isNotEmpty ? fetched.phone : basePatient.phone,
             dob: fetched.dob ?? basePatient.dob,
+            dobRaw:
+                fetched.dobRaw.isNotEmpty ? fetched.dobRaw : basePatient.dobRaw,
+            abhaDob: fetched.abhaDob.isNotEmpty
+                ? fetched.abhaDob
+                : basePatient.abhaDob,
             age: fetched.age > 0 ? fetched.age : basePatient.age,
             gender: (fetched.gender.isNotEmpty && fetched.gender != '—')
                 ? fetched.gender
@@ -1229,16 +1270,24 @@ class NurseApiService {
     );
   }
 
-  /// Fetches live Official ABHA Health Card details for a patient (`GET /api/patients/:id`
-  /// + ABHA card sub-routes) so `ABHA Number`, `ABHA Address`, `DOB`, `Gender`, `UHID`, and `Mobile`
-  /// always match the live server (`Screenshot (778).png`).
+  /// Fetches live Official ABHA Health Card details for a patient (`GET /api/patients/:id`,
+  /// `GET /api/abha` + ABHA card sub-routes) so `ABHA Number`, `ABHA Address`, `DOB`, `Gender`,
+  /// `UHID`, and `Mobile` always match the live server (`Screenshot (778).png`).
   Future<PatientDirectoryRecord> fetchPatientAbhaCard(
     PatientDirectoryRecord base,
   ) async {
     if (base.id.isEmpty) return base;
     PatientDirectoryRecord merged = base;
 
-    final candidateUrls = <String>[
+    Future<dynamic> safeGet(String url) async {
+      try {
+        return await _client.get(url, timeout: const Duration(seconds: 6));
+      } catch (_) {
+        return null;
+      }
+    }
+
+    final singleUrls = <String>[
       endpoints.patientDetail(base.id),
       endpoints.patientAbha(base.id),
       endpoints.patientAbhaCard(base.id),
@@ -1246,47 +1295,83 @@ class NurseApiService {
       endpoints.abhaPatient(base.id),
     ];
 
-    for (final url in candidateUrls) {
-      try {
-        final res = await _client.get(
-          url,
-          timeout: const Duration(seconds: 6),
-        );
-        final obj = JsonParsers.extractObject(res);
-        final map = obj.isNotEmpty
-            ? obj
-            : (res is Map ? JsonParsers.asMap(res) : <String, dynamic>{});
-        if (map.isEmpty) continue;
-        final parsed = PatientDirectoryRecord.fromJson(map);
-        merged = merged.copyWith(
-          id: parsed.id.isNotEmpty ? parsed.id : merged.id,
-          patientUniqueId: parsed.patientUniqueId.isNotEmpty
-              ? parsed.patientUniqueId
-              : merged.patientUniqueId,
-          patientName:
-              (parsed.patientName.isNotEmpty && parsed.patientName != '—')
-                  ? parsed.patientName
-                  : merged.patientName,
-          dob: parsed.dob ?? merged.dob,
-          age: parsed.age > 0 ? parsed.age : merged.age,
-          gender: (parsed.gender.isNotEmpty && parsed.gender != '—')
-              ? parsed.gender
-              : merged.gender,
-          phone: parsed.phone.isNotEmpty ? parsed.phone : merged.phone,
-          bloodGroup: parsed.bloodGroup.isNotEmpty
-              ? parsed.bloodGroup
-              : merged.bloodGroup,
-          abhaNumber: parsed.abhaNumber.isNotEmpty
-              ? parsed.abhaNumber
-              : merged.abhaNumber,
-          abhaAddress: parsed.abhaAddress.isNotEmpty
-              ? parsed.abhaAddress
-              : merged.abhaAddress,
-          image: (parsed.image != null && parsed.image!.trim().isNotEmpty)
-              ? parsed.image
-              : merged.image,
-        );
-      } catch (_) {}
+    final responses = await Future.wait<dynamic>([
+      ...singleUrls.map(safeGet),
+      safeGet(endpoints.abha),
+    ]);
+
+    void applyParsed(PatientDirectoryRecord parsed, {required bool isAbhaDoc}) {
+      merged = merged.copyWith(
+        id: parsed.id.isNotEmpty && !isAbhaDoc ? parsed.id : merged.id,
+        patientUniqueId: parsed.patientUniqueId.isNotEmpty
+            ? parsed.patientUniqueId
+            : merged.patientUniqueId,
+        patientName: (parsed.patientName.isNotEmpty && parsed.patientName != '—')
+            ? parsed.patientName
+            : merged.patientName,
+        dob: parsed.dob ?? merged.dob,
+        dobRaw: parsed.dobRaw.isNotEmpty ? parsed.dobRaw : merged.dobRaw,
+        abhaDob: parsed.abhaDob.isNotEmpty
+            ? parsed.abhaDob
+            : (isAbhaDoc && parsed.dobRaw.isNotEmpty
+                ? parsed.dobRaw
+                : merged.abhaDob),
+        age: parsed.age > 0 ? parsed.age : merged.age,
+        gender: (parsed.gender.isNotEmpty && parsed.gender != '—')
+            ? parsed.gender
+            : merged.gender,
+        phone: parsed.phone.isNotEmpty ? parsed.phone : merged.phone,
+        bloodGroup: parsed.bloodGroup.isNotEmpty
+            ? parsed.bloodGroup
+            : merged.bloodGroup,
+        abhaNumber: parsed.abhaNumber.isNotEmpty
+            ? parsed.abhaNumber
+            : merged.abhaNumber,
+        abhaAddress: parsed.abhaAddress.isNotEmpty
+            ? parsed.abhaAddress
+            : merged.abhaAddress,
+        image: (parsed.image != null && parsed.image!.trim().isNotEmpty)
+            ? parsed.image
+            : merged.image,
+      );
+    }
+
+    for (var i = 0; i < singleUrls.length; i++) {
+      final res = responses[i];
+      if (res == null || res is! Map) continue;
+      final obj = JsonParsers.extractObject(res);
+      final map = obj.isNotEmpty ? obj : JsonParsers.asMap(res);
+      if (map.isEmpty) continue;
+      applyParsed(
+        PatientDirectoryRecord.fromJson(map),
+        isAbhaDoc: i > 0,
+      );
+    }
+
+    // Match against `/api/abha` collection records as well
+    final abhaListRes = responses[singleUrls.length];
+    if (abhaListRes != null) {
+      for (final item in JsonParsers.extractList(abhaListRes)) {
+        final parsed = PatientDirectoryRecord.fromJson(item);
+        final addrMatch = merged.abhaAddress.isNotEmpty &&
+            parsed.abhaAddress.isNotEmpty &&
+            parsed.abhaAddress.toLowerCase() ==
+                merged.abhaAddress.toLowerCase();
+        final numMatch = merged.abhaNumber.isNotEmpty &&
+            parsed.abhaNumber.isNotEmpty &&
+            parsed.abhaNumber.toLowerCase() ==
+                merged.abhaNumber.toLowerCase();
+        if (_matchesPatientRecord(item, merged) || addrMatch || numMatch) {
+          applyParsed(parsed, isAbhaDoc: true);
+          break;
+        }
+      }
+    }
+
+    if (kDebugMode) {
+      debugPrint(
+        '[AbhaCardSync] patient="${merged.patientName}" uhid="${merged.patientUniqueId}" dobRaw="${merged.dobRaw}" abhaDob="${merged.abhaDob}" display="${merged.formattedAbhaDobSlash}"',
+      );
     }
     return merged;
   }

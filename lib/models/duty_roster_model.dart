@@ -159,7 +159,7 @@ class DutyShiftAssignment {
         json['roster_date'] ??
         json['rosterDate'] ??
         json['shift_date'];
-    final parsedDt = JsonParsers.asDateTime(rawDate);
+    final parsedDt = JsonParsers.asCalendarDate(rawDate);
     String dateStr = JsonParsers.asString(rawDate);
     if (dateStr.contains('T')) {
       dateStr = dateStr.split('T').first;
