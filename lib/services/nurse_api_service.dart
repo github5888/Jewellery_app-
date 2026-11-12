@@ -1086,7 +1086,7 @@ class NurseApiService {
             serviceType: ch.chargeType.isNotEmpty ? ch.chargeType : 'IPD Charge',
             billReference: ipd.ipdNo,
             description: ch.chargeName,
-            amount: ch.amount,
+            amount: ch.totalAmount,
             status: 'Billed',
             date: ch.date,
           ),

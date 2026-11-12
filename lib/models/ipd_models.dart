@@ -728,6 +728,7 @@ class NursingProcedureCharge {
   });
 
   double get totalAmount => appliedCharge * qty;
+  double get amount => totalAmount;
 
   factory NursingProcedureCharge.fromJson(Map<String, dynamic> json) {
     return NursingProcedureCharge(
