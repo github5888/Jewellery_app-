@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../config/app_config.dart';
 import 'api_exception.dart';
@@ -400,6 +401,7 @@ class ApiClient {
     required Uint8List bytes,
     required String filename,
     String fieldName = 'file',
+    String? mimeType,
     Duration timeout = const Duration(seconds: 30),
   }) async {
     final uri = _buildUri(urlOrPath);
@@ -412,21 +414,87 @@ class ApiClient {
         !AppConfig.isLoopbackUrl(_baseUrl)) {
       request.headers['X-Hospital-Target'] = _baseUrl;
     }
+
+    String resolvedMime = (mimeType ?? '').trim().toLowerCase();
+    if (!resolvedMime.contains('/')) {
+      final lowerName = filename.toLowerCase();
+      if (lowerName.endsWith('.png')) {
+        resolvedMime = 'image/png';
+      } else if (lowerName.endsWith('.webp')) {
+        resolvedMime = 'image/webp';
+      } else if (lowerName.endsWith('.gif')) {
+        resolvedMime = 'image/gif';
+      } else if (lowerName.endsWith('.pdf')) {
+        resolvedMime = 'application/pdf';
+      } else {
+        resolvedMime = 'image/jpeg';
+      }
+    }
+    MediaType? contentType;
+    try {
+      contentType = MediaType.parse(resolvedMime);
+    } catch (_) {
+      contentType = MediaType('image', 'jpeg');
+    }
+
     request.files.add(
-      http.MultipartFile.fromBytes(fieldName, bytes, filename: filename),
+      http.MultipartFile.fromBytes(
+        fieldName,
+        bytes,
+        filename: filename,
+        contentType: contentType,
+      ),
     );
     try {
       final streamed = await _http.send(request).timeout(timeout);
       final response = await http.Response.fromStream(streamed);
       final decoded = _decodeResponse(response, triggerAuthCallback: true);
       if (decoded is Map) {
-        final data = decoded['data'];
-        final candidate = decoded['url'] ??
-            decoded['path'] ??
-            decoded['file'] ??
-            (data is Map ? (data['url'] ?? data['path'] ?? data['file']) : data);
-        if (candidate != null && candidate.toString().trim().isNotEmpty) {
-          return candidate.toString().trim();
+        String extractPathFromMap(Map<dynamic, dynamic> m) {
+          for (final k in const [
+            'url',
+            'fileUrl',
+            'file_url',
+            'imageUrl',
+            'image_url',
+            'secure_url',
+            'filePath',
+            'file_path',
+            'path',
+            'image',
+            'photo',
+            'avatar',
+            'profilePhoto',
+            'profile_photo',
+            'location',
+            'filename',
+          ]) {
+            final v = m[k];
+            if (v is String && v.trim().isNotEmpty) {
+              return v.trim();
+            }
+          }
+          return '';
+        }
+
+        for (final candidateMap in <dynamic>[
+          decoded,
+          decoded['data'],
+          decoded['file'],
+          decoded['user'],
+          decoded['staff'],
+          decoded['profile'],
+        ]) {
+          if (candidateMap is Map) {
+            final extracted = extractPathFromMap(candidateMap);
+            if (extracted.isNotEmpty) {
+              return extracted;
+            }
+          } else if (candidateMap is String &&
+              candidateMap.trim().isNotEmpty &&
+              candidateMap != decoded) {
+            return candidateMap.trim();
+          }
         }
       }
       throw const ApiException(

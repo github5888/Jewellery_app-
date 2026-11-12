@@ -37,10 +37,19 @@ class PatientAvatar extends StatefulWidget {
   static final Map<String, Uint8List> _memoryCache = <String, Uint8List>{};
   static final Map<String, Future<Uint8List?>> _inFlight =
       <String, Future<Uint8List?>>{};
+  static int _cacheGeneration = 0;
 
   static void clearCache() {
     _memoryCache.clear();
     _inFlight.clear();
+    _cacheGeneration++;
+  }
+
+  static void primeCache(String baseUrl, String rawPath, Uint8List bytes) {
+    final trimmed = rawPath.trim();
+    if (trimmed.isEmpty || bytes.isEmpty) return;
+    _memoryCache['$baseUrl|$trimmed'] = bytes;
+    _cacheGeneration++;
   }
 
   @override
@@ -50,6 +59,8 @@ class PatientAvatar extends StatefulWidget {
 class _PatientAvatarState extends State<PatientAvatar> {
   Uint8List? _resolvedBytes;
   String? _activeKey;
+  String? _lastAuthToken;
+  int _seenGeneration = PatientAvatar._cacheGeneration;
 
   @override
   void initState() {
@@ -66,8 +77,13 @@ class _PatientAvatarState extends State<PatientAvatar> {
   @override
   void didUpdateWidget(covariant PatientAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final currentToken = _readAuthToken();
+    final tokenArrived = (_lastAuthToken == null || _lastAuthToken!.isEmpty) &&
+        (currentToken != null && currentToken.isNotEmpty);
     if (oldWidget.imagePath != widget.imagePath ||
-        oldWidget.baseUrl != widget.baseUrl) {
+        oldWidget.baseUrl != widget.baseUrl ||
+        _seenGeneration != PatientAvatar._cacheGeneration ||
+        (tokenArrived && _resolvedBytes == null)) {
       _syncImage(allowSetState: true);
     }
   }
@@ -186,18 +202,22 @@ class _PatientAvatarState extends State<PatientAvatar> {
     }
 
     final cacheKey = '${widget.baseUrl}|$raw';
-    if (_activeKey == cacheKey && _resolvedBytes != null) {
-      return;
-    }
-    _activeKey = cacheKey;
+    final genChanged = _seenGeneration != PatientAvatar._cacheGeneration;
+    _seenGeneration = PatientAvatar._cacheGeneration;
 
     final cached = PatientAvatar._memoryCache[cacheKey];
     if (cached != null) {
+      _activeKey = cacheKey;
       if (_resolvedBytes != cached) {
         _applyBytes(cached, allowSetState: allowSetState);
       }
       return;
     }
+
+    if (!genChanged && _activeKey == cacheKey && _resolvedBytes != null) {
+      return;
+    }
+    _activeKey = cacheKey;
 
     final candidates = AppConfig.resolveMediaCandidateUrls(
       widget.baseUrl,
@@ -208,7 +228,7 @@ class _PatientAvatarState extends State<PatientAvatar> {
       return;
     }
 
-    if (candidates.first.startsWith('data:image/')) {
+    if (candidates.first.toLowerCase().startsWith('data:')) {
       final decoded = _tryDecodeDataUri(candidates.first);
       if (decoded != null) {
         PatientAvatar._memoryCache[cacheKey] = decoded;
@@ -218,6 +238,7 @@ class _PatientAvatarState extends State<PatientAvatar> {
     }
 
     final token = _readAuthToken();
+    _lastAuthToken = token;
     final future = PatientAvatar._inFlight.putIfAbsent(
       cacheKey,
       () => _fetchCandidateBytes(candidates, token),

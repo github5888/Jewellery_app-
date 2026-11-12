@@ -143,9 +143,26 @@ class _NurseProfileScreenState extends State<NurseProfileScreen> {
   }
 
   Future<void> _handleChangeProfilePhoto() async {
+    if (_uploadingPhoto) return;
     final controller = NursePortalScope.read(context);
     if (ProfilePhotoPicker.supportsNativePicker) {
-      final picked = await ProfilePhotoPicker.pickImage();
+      PickedPhotoData? picked;
+      try {
+        picked = await ProfilePhotoPicker.pickImage();
+      } on FormatException catch (fe) {
+        if (!mounted) return;
+        if (fe.message == 'NATIVE_REBUILD_NEEDED') {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Please stop & run flutter run once to enable Android Gallery Picker.',
+              ),
+              backgroundColor: AppColors.warning,
+            ),
+          );
+          return;
+        }
+      }
       if (picked == null || !mounted) return;
       setState(() => _uploadingPhoto = true);
       try {
@@ -461,73 +478,94 @@ class _NurseProfileScreenState extends State<NurseProfileScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      // Avatar + Camera Icon + Green Online Dot (matching image-13..15)
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(2.5),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isLightBanner
-                                    ? themePreset.primaryColor
-                                    : Colors.white,
-                                width: 2.2,
-                              ),
-                            ),
-                            child: PatientAvatar(
-                              name: user?.fullName ?? 'Sunita Rao',
-                              imagePath: user?.image,
-                              baseUrl: controller.baseUrl,
-                              radius: 33,
-                            ),
-                          ),
-                          // Top-right camera button
-                          Positioned(
-                            top: -2,
-                            right: -2,
-                            child: GestureDetector(
-                              onTap: _uploadingPhoto
-                                  ? null
-                                  : _handleChangeProfilePhoto,
-                              child: Container(
-                                width: 25,
-                                height: 25,
+                      // Avatar + Camera Icon + Green Online Dot (matching image-40)
+                      GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap:
+                            _uploadingPhoto ? null : _handleChangeProfilePhoto,
+                        child: Padding(
+                          padding: const EdgeInsets.all(2),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(2.5),
                                 decoration: BoxDecoration(
-                                  color: themePreset.primaryColor,
                                   shape: BoxShape.circle,
                                   border: Border.all(
-                                    color: Colors.white,
-                                    width: 1.8,
+                                    color: isLightBanner
+                                        ? themePreset.primaryColor
+                                        : Colors.white,
+                                    width: 2.2,
                                   ),
                                 ),
-                                child: const Icon(
-                                  Icons.photo_camera_rounded,
-                                  size: 13,
-                                  color: Colors.white,
+                                child: PatientAvatar(
+                                  name: user?.fullName ?? 'Sunita Rao',
+                                  imagePath: user?.image,
+                                  baseUrl: controller.baseUrl,
+                                  radius: 34,
                                 ),
                               ),
-                            ),
-                          ),
-                          // Bottom-right green online dot
-                          Positioned(
-                            bottom: 2,
-                            right: 2,
-                            child: Container(
-                              width: 13,
-                              height: 13,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF22C55E),
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2,
+                              if (_uploadingPhoto)
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      color: Color(0x660F172A),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2.4,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              // Top-right camera button
+                              Positioned(
+                                top: 0,
+                                right: 0,
+                                child: Container(
+                                  width: 27,
+                                  height: 27,
+                                  decoration: BoxDecoration(
+                                    color: themePreset.primaryColor,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 1.8,
+                                    ),
+                                  ),
+                                  child: const Icon(
+                                    Icons.photo_camera_rounded,
+                                    size: 13.5,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
-                            ),
+                              // Bottom-right green online dot
+                              Positioned(
+                                bottom: 2,
+                                right: 2,
+                                child: Container(
+                                  width: 13,
+                                  height: 13,
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF22C55E),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                       const SizedBox(width: 14),
                       Expanded(

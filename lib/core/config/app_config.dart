@@ -62,19 +62,25 @@ class AppConfig {
     var clean = rawPath.trim();
     if (clean.isEmpty) return null;
     final lower = clean.toLowerCase();
-    if (lower == 'null' || lower == 'undefined' || lower == 'none') {
+    if (lower == 'null' ||
+        lower == 'undefined' ||
+        lower == 'none' ||
+        lower == 'n/a' ||
+        lower == 'default.png' ||
+        lower == 'avatar.png' ||
+        lower == 'no-image.png') {
       return null;
     }
-    if (clean.startsWith('data:image/')) {
+    if (lower.startsWith('data:')) {
       return clean;
     }
     // Detect raw base64 image payloads stored without data URI header
     final compact = clean.replaceAll(RegExp(r'\s+'), '');
-    if (compact.length > 120 && !compact.contains('://')) {
+    if (compact.length > 100 && !compact.contains('://') && !compact.startsWith('/')) {
       if (compact.startsWith('/9j/')) {
         return 'data:image/jpeg;base64,$compact';
       }
-      if (compact.startsWith('iVBORw0KGgo')) {
+      if (compact.startsWith('iVBOR')) {
         return 'data:image/png;base64,$compact';
       }
       if (compact.startsWith('R0lGOD')) {
@@ -83,6 +89,10 @@ class AppConfig {
       if (compact.startsWith('UklGR')) {
         return 'data:image/webp;base64,$compact';
       }
+    }
+    if (clean.startsWith('/9j/') && clean.length > 100) {
+      final jpegCompact = clean.replaceAll(RegExp(r'\s+'), '');
+      return 'data:image/jpeg;base64,$jpegCompact';
     }
     return clean.replaceAll('\\', '/');
   }
@@ -103,14 +113,15 @@ class AppConfig {
 
   /// Ordered candidate URLs for profile/patient photos across Express/Multer storage conventions:
   /// handles `/uploads/...`, `uploads/...`, `/public/uploads/...`, `/api/uploads/...`,
-  /// `/api/files/...`, full URLs, `data:image/...`, and bare filenames (`1731320-photo.png`).
+  /// `/api/files/...`, `http://` -> `https://` Nginx rewrites, `localhost` rewrites,
+  /// `data:...;base64,...`, and bare filenames (`1731320-photo.png`).
   static List<String> resolveMediaCandidateUrls(
     String baseUrl,
     String? rawPath,
   ) {
     final clean = _cleanMediaRaw(rawPath);
     if (clean == null) return const [];
-    if (clean.startsWith('data:image/')) {
+    if (clean.toLowerCase().startsWith('data:')) {
       return <String>[clean];
     }
 
@@ -123,52 +134,82 @@ class AppConfig {
       }
     }
 
+    void addRelativePathVariants(String relPath) {
+      var rel = relPath.trim();
+      if (rel.isEmpty) return;
+      if (rel.startsWith('public/')) {
+        rel = rel.substring('public/'.length);
+      } else if (rel.startsWith('/public/')) {
+        rel = rel.substring('/public'.length);
+      }
+      final withSlash = rel.startsWith('/') ? rel : '/$rel';
+
+      if (withSlash.startsWith('/uploads/')) {
+        addCandidate('$transportBase$withSlash');
+        addCandidate('$transportBase/api$withSlash');
+        addCandidate(
+          '$transportBase${withSlash.replaceFirst('/uploads/', '/api/files/')}',
+        );
+      } else if (withSlash.startsWith('/api/')) {
+        addCandidate('$transportBase$withSlash');
+        if (withSlash.startsWith('/api/uploads/')) {
+          addCandidate(
+            '$transportBase${withSlash.replaceFirst('/api/uploads/', '/uploads/')}',
+          );
+        } else if (withSlash.startsWith('/api/files/')) {
+          addCandidate(
+            '$transportBase${withSlash.replaceFirst('/api/files/', '/uploads/')}',
+          );
+        }
+      } else {
+        final noLead = rel.startsWith('/') ? rel.substring(1) : rel;
+        addCandidate('$transportBase/uploads/$noLead');
+        addCandidate('$transportBase/uploads/profile/$noLead');
+        addCandidate('$transportBase/uploads/staff/$noLead');
+        addCandidate('$transportBase/uploads/avatars/$noLead');
+        addCandidate('$transportBase/uploads/users/$noLead');
+        addCandidate('$transportBase/uploads/profile_photo/$noLead');
+        addCandidate('$transportBase/uploads/staff_photo/$noLead');
+        addCandidate('$transportBase/uploads/images/$noLead');
+        addCandidate('$transportBase/api/uploads/$noLead');
+        addCandidate('$transportBase/api/files/profile/$noLead');
+        addCandidate('$transportBase/api/files/staff/$noLead');
+        addCandidate('$transportBase$withSlash');
+      }
+    }
+
     if (clean.startsWith('http://') || clean.startsWith('https://')) {
-      if (kIsWeb && webProxyActive && !isLoopbackUrl(clean)) {
-        final parsed = Uri.tryParse(_encodeFullUrl(clean));
-        if (parsed != null) {
-          final q = parsed.hasQuery ? '?${parsed.query}' : '';
+      final parsed = Uri.tryParse(_encodeFullUrl(clean));
+      if (parsed != null && parsed.path.isNotEmpty && parsed.path != '/') {
+        final q = parsed.hasQuery ? '?${parsed.query}' : '';
+        final hostLower = parsed.host.toLowerCase();
+        final baseUri = Uri.tryParse(normalizeBaseUrl(baseUrl));
+        final sameOrInternalHost = hostLower == 'localhost' ||
+            hostLower == '127.0.0.1' ||
+            hostLower.startsWith('10.') ||
+            hostLower.startsWith('192.168.') ||
+            (baseUri != null && baseUri.host.toLowerCase() == hostLower);
+
+        if (sameOrInternalHost) {
+          addRelativePathVariants('${parsed.path}$q');
+        }
+        if (kIsWeb && webProxyActive && !isLoopbackUrl(clean)) {
           addCandidate('$localWebCorsProxyUrl${parsed.path}$q');
         }
       }
+      // Upgrade cleartext http:// external/hospital URLs to https:// first on mobile
+      if (clean.startsWith('http://') && !isLoopbackUrl(clean)) {
+        addCandidate('https://${clean.substring('http://'.length)}');
+      }
       addCandidate(clean);
+      if (parsed != null && parsed.path.isNotEmpty && parsed.path != '/') {
+        final q = parsed.hasQuery ? '?${parsed.query}' : '';
+        addRelativePathVariants('${parsed.path}$q');
+      }
       return results;
     }
 
-    var rel = clean;
-    if (rel.startsWith('public/')) {
-      rel = rel.substring('public/'.length);
-    } else if (rel.startsWith('/public/')) {
-      rel = rel.substring('/public'.length);
-    }
-
-    final withSlash = rel.startsWith('/') ? rel : '/$rel';
-
-    if (withSlash.startsWith('/uploads/')) {
-      addCandidate('$transportBase$withSlash');
-      addCandidate('$transportBase/api$withSlash');
-      addCandidate(
-        '$transportBase${withSlash.replaceFirst('/uploads/', '/api/files/')}',
-      );
-    } else if (withSlash.startsWith('/api/')) {
-      addCandidate('$transportBase$withSlash');
-      if (withSlash.startsWith('/api/uploads/')) {
-        addCandidate(
-          '$transportBase${withSlash.replaceFirst('/api/uploads/', '/uploads/')}',
-        );
-      }
-    } else {
-      // Bare filename or subfolder path without `/uploads/` prefix (e.g. `17313.png` or `staff/17313.png`)
-      final noLead = rel.startsWith('/') ? rel.substring(1) : rel;
-      addCandidate('$transportBase/uploads/$noLead');
-      addCandidate('$transportBase/uploads/profile/$noLead');
-      addCandidate('$transportBase/uploads/staff/$noLead');
-      addCandidate('$transportBase/uploads/avatars/$noLead');
-      addCandidate('$transportBase/uploads/users/$noLead');
-      addCandidate('$transportBase/api/uploads/$noLead');
-      addCandidate('$transportBase$withSlash');
-    }
-
+    addRelativePathVariants(clean);
     return results;
   }
 

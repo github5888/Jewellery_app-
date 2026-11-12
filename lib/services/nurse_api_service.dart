@@ -191,6 +191,25 @@ class NurseApiService {
           if (matches) {
             merged = _mergeNonEmptyMap(merged, s);
             parsed = NurseUser.fromJson(merged);
+            // If list endpoint omitted large photo/image field, fetch full `/api/staff/:sid`
+            if ((parsed.image == null || parsed.image!.trim().isEmpty) &&
+                sid.isNotEmpty &&
+                sid != parsed.id) {
+              try {
+                final detailRes = await _client.get(
+                  endpoints.staffDetail(sid),
+                  timeout: const Duration(seconds: 6),
+                );
+                final detailObj = _mergeNonEmptyMap(
+                  JsonParsers.extractObject(detailRes),
+                  JsonParsers.asMap(detailRes),
+                );
+                if (detailObj.isNotEmpty) {
+                  merged = _mergeNonEmptyMap(merged, detailObj);
+                  parsed = NurseUser.fromJson(merged);
+                }
+              } catch (_) {}
+            }
             break;
           }
         }
@@ -214,6 +233,10 @@ class NurseApiService {
     required String permanentAddress,
     String? image,
   }) async {
+    final cleanImg = (image != null && image.trim().isNotEmpty)
+        ? image.trim()
+        : null;
+
     final payload = <String, dynamic>{
       'name': name.trim(),
       'firstName': name.trim(),
@@ -240,21 +263,51 @@ class NurseApiService {
       'currentAddress': currentAddress.trim(),
       'permanent_address': permanentAddress.trim(),
       'permanentAddress': permanentAddress.trim(),
-      if (image != null && image.trim().isNotEmpty) ...{
-        'image': image.trim(),
-        'photo': image.trim(),
-        'avatar': image.trim(),
-        'profilePhoto': image.trim(),
-        'profile_photo': image.trim(),
-        'profileImage': image.trim(),
-        'profile_image': image.trim(),
+      if (cleanImg != null) ...{
+        'image': cleanImg,
+        'photo': cleanImg,
+        'avatar': cleanImg,
+        'profilePhoto': cleanImg,
+        'profile_photo': cleanImg,
+        'profileImage': cleanImg,
+        'profile_image': cleanImg,
+        'staff_photo': cleanImg,
+        'user_photo': cleanImg,
       },
     };
+
+    // Best-effort sync to matching `/api/staff/:sid` document so Staff & User stay 100% aligned
+    Future<void> syncStaffRecordIfMatched() async {
+      try {
+        final staffRes = await _client.get(
+          endpoints.staffList,
+          timeout: const Duration(seconds: 6),
+        );
+        final staffItems = JsonParsers.extractList(staffRes);
+        for (final s in staffItems) {
+          final sid = JsonParsers.asId(s['_id'] ?? s['id']);
+          final semail = JsonParsers.asString(s['email']).toLowerCase();
+          if (sid.isNotEmpty &&
+              ((userId.trim().isNotEmpty && sid == userId.trim()) ||
+                  (email.trim().isNotEmpty &&
+                      semail == email.trim().toLowerCase()))) {
+            await _client.put(
+              endpoints.staffDetail(sid),
+              body: payload,
+              timeout: const Duration(seconds: 8),
+            );
+            break;
+          }
+        }
+      } catch (_) {}
+    }
 
     final candidateUrls = <String>[
       endpoints.authProfile,
       endpoints.authMe,
       endpoints.usersProfile,
+      endpoints.profile,
+      if (userId.trim().isNotEmpty) endpoints.userDetail(userId.trim()),
       if (userId.trim().isNotEmpty) endpoints.staffDetail(userId.trim()),
     ];
 
@@ -263,47 +316,57 @@ class NurseApiService {
       try {
         final res = await _client.put(url, body: payload);
         final obj = JsonParsers.extractObject(res);
+        if (cleanImg != null) {
+          await syncStaffRecordIfMatched();
+        }
         try {
           final fresh = await fetchMe();
-          if (obj.isNotEmpty) {
-            final updatedOnly = NurseUser.fromJson(obj);
-            return fresh.copyWith(
-              name: updatedOnly.name.isNotEmpty ? updatedOnly.name : fresh.name,
-              surname: updatedOnly.surname.isNotEmpty
-                  ? updatedOnly.surname
-                  : fresh.surname,
-              email:
-                  updatedOnly.email.isNotEmpty ? updatedOnly.email : fresh.email,
-              phone:
-                  updatedOnly.phone.isNotEmpty ? updatedOnly.phone : fresh.phone,
-              emergencyContact: updatedOnly.emergencyContact.isNotEmpty
-                  ? updatedOnly.emergencyContact
-                  : fresh.emergencyContact,
-              gender: updatedOnly.gender.isNotEmpty
-                  ? updatedOnly.gender
-                  : fresh.gender,
-              dob: updatedOnly.dob ?? fresh.dob,
-              dobRaw: updatedOnly.dobRaw.isNotEmpty
-                  ? updatedOnly.dobRaw
-                  : fresh.dobRaw,
-              bloodGroup: updatedOnly.bloodGroup.isNotEmpty
-                  ? updatedOnly.bloodGroup
-                  : fresh.bloodGroup,
-              currentAddress: updatedOnly.currentAddress.isNotEmpty
-                  ? updatedOnly.currentAddress
-                  : fresh.currentAddress,
-              permanentAddress: updatedOnly.permanentAddress.isNotEmpty
-                  ? updatedOnly.permanentAddress
-                  : fresh.permanentAddress,
-              image: (updatedOnly.image != null &&
-                      updatedOnly.image!.trim().isNotEmpty)
-                  ? updatedOnly.image
-                  : fresh.image,
-            );
-          }
-          return fresh;
+          final updatedOnly =
+              obj.isNotEmpty ? NurseUser.fromJson(obj) : fresh;
+          final resolvedImg = (updatedOnly.image != null &&
+                  updatedOnly.image!.trim().isNotEmpty)
+              ? updatedOnly.image
+              : ((fresh.image != null && fresh.image!.trim().isNotEmpty)
+                  ? fresh.image
+                  : cleanImg);
+          return fresh.copyWith(
+            name: updatedOnly.name.isNotEmpty ? updatedOnly.name : fresh.name,
+            surname: updatedOnly.surname.isNotEmpty
+                ? updatedOnly.surname
+                : fresh.surname,
+            email:
+                updatedOnly.email.isNotEmpty ? updatedOnly.email : fresh.email,
+            phone:
+                updatedOnly.phone.isNotEmpty ? updatedOnly.phone : fresh.phone,
+            emergencyContact: updatedOnly.emergencyContact.isNotEmpty
+                ? updatedOnly.emergencyContact
+                : fresh.emergencyContact,
+            gender: updatedOnly.gender.isNotEmpty
+                ? updatedOnly.gender
+                : fresh.gender,
+            dob: updatedOnly.dob ?? fresh.dob,
+            dobRaw: updatedOnly.dobRaw.isNotEmpty
+                ? updatedOnly.dobRaw
+                : fresh.dobRaw,
+            bloodGroup: updatedOnly.bloodGroup.isNotEmpty
+                ? updatedOnly.bloodGroup
+                : fresh.bloodGroup,
+            currentAddress: updatedOnly.currentAddress.isNotEmpty
+                ? updatedOnly.currentAddress
+                : fresh.currentAddress,
+            permanentAddress: updatedOnly.permanentAddress.isNotEmpty
+                ? updatedOnly.permanentAddress
+                : fresh.permanentAddress,
+            image: resolvedImg,
+          );
         } catch (_) {
-          if (obj.isNotEmpty) return NurseUser.fromJson(obj);
+          if (obj.isNotEmpty) {
+            final parsedObj = NurseUser.fromJson(obj);
+            return cleanImg != null &&
+                    (parsedObj.image == null || parsedObj.image!.trim().isEmpty)
+                ? parsedObj.copyWith(image: cleanImg)
+                : parsedObj;
+          }
         }
       } on ApiException catch (e) {
         lastError = e;
@@ -316,7 +379,11 @@ class NurseApiService {
       }
     }
     if (lastError != null) throw lastError;
-    return await fetchMe();
+    final fallbackFresh = await fetchMe();
+    return cleanImg != null &&
+            (fallbackFresh.image == null || fallbackFresh.image!.trim().isEmpty)
+        ? fallbackFresh.copyWith(image: cleanImg)
+        : fallbackFresh;
   }
 
   Future<String> uploadProfilePhoto({
@@ -326,8 +393,10 @@ class NurseApiService {
   }) async {
     for (final target in [
       (url: endpoints.authProfilePhoto, field: 'photo'),
+      (url: endpoints.authProfilePhoto, field: 'file'),
       (url: endpoints.authAvatar, field: 'avatar'),
       (url: endpoints.uploads, field: 'file'),
+      (url: endpoints.uploads, field: 'image'),
     ]) {
       try {
         final uploadedPath = await _client.uploadMultipartBytes(
@@ -335,6 +404,7 @@ class NurseApiService {
           bytes: bytes,
           filename: filename,
           fieldName: target.field,
+          mimeType: mimeType,
         );
         if (uploadedPath.trim().isNotEmpty) {
           return uploadedPath.trim();

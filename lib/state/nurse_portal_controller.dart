@@ -18,6 +18,7 @@ import '../models/nurse_user.dart';
 import '../models/opd_models.dart';
 import '../models/patient_directory_model.dart';
 import '../services/nurse_api_service.dart';
+import '../widgets/patient_avatar.dart';
 
 enum AuthStage { initializing, unauthenticated, authenticated }
 
@@ -266,20 +267,30 @@ class NursePortalController extends ChangeNotifier {
     String resolvedImage;
     if (directImageUrl != null && directImageUrl.trim().isNotEmpty) {
       resolvedImage = directImageUrl.trim();
+      PatientAvatar.clearCache();
     } else if (bytes != null && bytes.isNotEmpty) {
       resolvedImage = await api.uploadProfilePhoto(
         bytes: bytes,
         filename: filename,
         mimeType: mimeType,
       );
+      PatientAvatar.primeCache(_baseUrl, resolvedImage, bytes);
     } else {
       return;
     }
 
     final u = _currentUser;
     if (u != null) {
+      // Optimistically apply photo immediately so UI avatars update in 0ms
+      _currentUser = u.copyWith(image: resolvedImage);
+      await _prefs?.setString(
+        AppConfig.storageKeyCachedUser,
+        jsonEncode(_currentUser!.toJson()),
+      );
+      notifyListeners();
+
       try {
-        await updateCurrentUserProfile(
+        final saved = await updateCurrentUserProfile(
           name: u.name,
           surname: u.surname,
           email: u.email,
@@ -292,14 +303,14 @@ class NursePortalController extends ChangeNotifier {
           permanentAddress: u.permanentAddress,
           image: resolvedImage,
         );
-      } catch (_) {
-        _currentUser = u.copyWith(image: resolvedImage);
-        await _prefs?.setString(
-          AppConfig.storageKeyCachedUser,
-          jsonEncode(_currentUser!.toJson()),
-        );
-        notifyListeners();
-      }
+        if (bytes != null &&
+            bytes.isNotEmpty &&
+            saved.image != null &&
+            saved.image!.trim().isNotEmpty) {
+          PatientAvatar.primeCache(_baseUrl, saved.image!, bytes);
+          notifyListeners();
+        }
+      } catch (_) {}
     }
   }
 
@@ -876,13 +887,17 @@ class NursePortalController extends ChangeNotifier {
       _staffDirectory = loadedStaff;
     }
     if (refreshedUser != null) {
-      _currentUser = refreshedUser;
+      final preservedImg =
+          (refreshedUser.image != null && refreshedUser.image!.trim().isNotEmpty)
+              ? refreshedUser.image
+              : _currentUser?.image;
+      _currentUser = refreshedUser.copyWith(image: preservedImg);
       if (refreshedUser.hospitalInfo != null) {
         _hospitalInfo = refreshedUser.hospitalInfo!;
       }
       _prefs?.setString(
         AppConfig.storageKeyCachedUser,
-        jsonEncode(refreshedUser.toJson()),
+        jsonEncode(_currentUser!.toJson()),
       );
     }
 

@@ -275,7 +275,60 @@ class NurseUser {
       }
     }
 
-    final img = pickStr(const [
+    String pickImg(List<String> keys) {
+      bool isValidImg(String val) {
+        final t = val.trim();
+        if (t.isEmpty) return false;
+        final l = t.toLowerCase();
+        return l != 'null' &&
+            l != 'undefined' &&
+            l != 'none' &&
+            l != 'n/a' &&
+            l != 'default.png' &&
+            l != 'avatar.png' &&
+            l != 'no-image.png';
+      }
+
+      String extractImgValue(dynamic raw) {
+        if (raw == null) return '';
+        if (raw is String) return raw.trim();
+        if (raw is Map) {
+          for (final subKey in const [
+            'data',
+            'base64',
+            'url',
+            'secure_url',
+            'fileUrl',
+            'file_url',
+            'imageUrl',
+            'image_url',
+            'path',
+            'filePath',
+            'file_path',
+            'src',
+            'location',
+            'filename',
+          ]) {
+            final sub = raw[subKey];
+            if (sub is String && isValidImg(sub)) {
+              return sub.trim();
+            }
+          }
+          return '';
+        }
+        return JsonParsers.asString(raw);
+      }
+
+      for (final m in [userSub, staffSub, profileSub, dataSub, json, source]) {
+        for (final k in keys) {
+          final v = extractImgValue(m[k]);
+          if (isValidImg(v)) return v;
+        }
+      }
+      return '';
+    }
+
+    final img = pickImg(const [
       'image',
       'photo',
       'avatar',
@@ -287,6 +340,8 @@ class NurseUser {
       'profile_pic',
       'profilePicture',
       'profile_picture',
+      'profile_img',
+      'profileImg',
       'photoUrl',
       'photo_url',
       'imageUrl',
@@ -301,6 +356,18 @@ class NurseUser {
       'userPhoto',
       'user_image',
       'userImage',
+      'user_avatar',
+      'userAvatar',
+      'avatar_data',
+      'avatarData',
+      'photo_data',
+      'photoData',
+      'image_data',
+      'imageData',
+      'base64Image',
+      'photoBase64',
+      'imageBase64',
+      'thumbnail',
       'picture',
       'img',
       'file',
