@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -113,10 +114,21 @@ class _PatientAvatarState extends State<PatientAvatar> {
   bool _looksLikeRealImageBytes(Uint8List bytes, String? contentType) {
     if (bytes.length < 16) return false;
     final ct = (contentType ?? '').toLowerCase();
-    if (ct.contains('text/html') || ct.contains('application/json')) {
+    if (ct.contains('text/html') ||
+        ct.contains('application/json') ||
+        ct.contains('text/plain')) {
       return false;
     }
-    // Check magic headers: JPEG (FF D8 FF), PNG (89 50 4E 47), GIF (47 49 46), WEBP (RIFF....WEBP), BMP (42 4D), SVG (<svg)
+    final head = String.fromCharCodes(bytes.take(32)).trimLeft().toLowerCase();
+    if (head.startsWith('<!doctype') ||
+        head.startsWith('<html') ||
+        head.startsWith('<head') ||
+        head.startsWith('<svg') ||
+        head.startsWith('{') ||
+        head.startsWith('[')) {
+      return false;
+    }
+    // Check magic headers: JPEG, PNG, GIF, WEBP, BMP, AVIF/HEIF (`ftyp`), ICO, TIFF
     if (bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) return true;
     if (bytes[0] == 0x89 &&
         bytes[1] == 0x50 &&
@@ -132,14 +144,13 @@ class _PatientAvatarState extends State<PatientAvatar> {
       return true;
     }
     if (bytes[0] == 0x42 && bytes[1] == 0x4D) return true;
-    if (ct.startsWith('image/')) return true;
-    // Reject HTML documents (`<!DOCTYPE` or `<html`)
-    final head = String.fromCharCodes(bytes.take(24)).trimLeft().toLowerCase();
-    if (head.startsWith('<!doctype') ||
-        head.startsWith('<html') ||
-        head.startsWith('{')) {
-      return false;
+    if (bytes[4] == 0x66 &&
+        bytes[5] == 0x74 &&
+        bytes[6] == 0x79 &&
+        bytes[7] == 0x70) {
+      return true;
     }
+    if (ct.startsWith('image/') || ct.contains('octet-stream')) return true;
     return false;
   }
 
@@ -179,6 +190,11 @@ class _PatientAvatarState extends State<PatientAvatar> {
           if (res.statusCode == 404) break;
         } catch (_) {}
       }
+    }
+    if (kDebugMode && candidates.isNotEmpty) {
+      debugPrint(
+        '[PatientAvatar] Could not load image for "${widget.name}" from ${candidates.first}',
+      );
     }
     return null;
   }

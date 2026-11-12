@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../core/utils/formatters.dart';
 import '../core/utils/json_parsers.dart';
 
@@ -293,6 +296,16 @@ class NurseUser {
         if (raw == null) return '';
         if (raw is String) return raw.trim();
         if (raw is Map) {
+          if (raw['type'] == 'Buffer' && raw['data'] is List) {
+            try {
+              final bytes = Uint8List.fromList(
+                (raw['data'] as List).map((e) => (e as num).toInt()).toList(),
+              );
+              if (bytes.isNotEmpty) {
+                return 'data:image/png;base64,${base64Encode(bytes)}';
+              }
+            } catch (_) {}
+          }
           for (final subKey in const [
             'data',
             'base64',
@@ -323,6 +336,20 @@ class NurseUser {
         for (final k in keys) {
           final v = extractImgValue(m[k]);
           if (isValidImg(v)) return v;
+        }
+      }
+      // Dynamic key fallback: scan any custom key containing photo/avatar/image/pic
+      for (final m in [userSub, staffSub, profileSub, dataSub, json]) {
+        for (final entry in m.entries) {
+          final lk = entry.key.toLowerCase();
+          if (lk.contains('hospital')) continue;
+          if (lk.contains('photo') ||
+              lk.contains('avatar') ||
+              lk.contains('image') ||
+              lk.contains('pic')) {
+            final v = extractImgValue(entry.value);
+            if (isValidImg(v)) return v;
+          }
         }
       }
       return '';

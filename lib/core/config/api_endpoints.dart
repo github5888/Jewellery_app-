@@ -28,6 +28,7 @@ class ApiEndpoints {
   String get authChangePassword => _url('/api/auth/change-password');
   String get authPasswordAlt => _url('/api/auth/password');
   String get usersProfile => _url('/api/users/profile');
+  String get usersList => _url('/api/users');
   String get profile => _url('/api/profile');
   String get staffList => _url('/api/staff');
   String staffDetail(String staffId) => _url('/api/staff/$staffId');

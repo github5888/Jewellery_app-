@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
+
 import '../core/config/api_endpoints.dart';
 import '../core/network/api_client.dart';
 import '../core/network/api_exception.dart';
@@ -124,82 +126,124 @@ class NurseApiService {
     );
     var parsed = NurseUser.fromJson(merged);
 
-    // Probe extended profile endpoints if photo or employment fields were omitted by `/api/auth/me`
-    final extraUrls = <String>[
-      endpoints.authProfile,
-      endpoints.usersProfile,
-      endpoints.profile,
-      if (parsed.id.isNotEmpty) endpoints.staffDetail(parsed.id),
-      if (parsed.id.isNotEmpty) endpoints.userDetail(parsed.id),
-    ];
+    final userMap = merged['user'] is Map
+        ? JsonParsers.asMap(merged['user'])
+        : <String, dynamic>{};
+    final staffRefId = JsonParsers.asId(
+      userMap['staff_id'] ??
+          userMap['staffId'] ??
+          userMap['staff'] ??
+          merged['staff_id'] ??
+          merged['staffId'],
+    );
 
-    for (final url in extraUrls) {
-      if (parsed.image != null &&
-          parsed.image!.trim().isNotEmpty &&
-          parsed.designation.isNotEmpty &&
-          parsed.specialist.isNotEmpty &&
-          parsed.qualification.isNotEmpty &&
-          parsed.workShift.isNotEmpty &&
-          (parsed.dateOfJoining != null ||
-              parsed.dateOfJoiningRaw.trim().isNotEmpty)) {
-        break;
+    bool needsEnrichment(NurseUser u) =>
+        u.image == null ||
+        u.image!.trim().isEmpty ||
+        u.staffCode.isEmpty ||
+        u.department.isEmpty ||
+        u.designation.isEmpty ||
+        u.specialist.isEmpty ||
+        u.qualification.isEmpty ||
+        u.workShift.isEmpty ||
+        (u.dateOfJoining == null && u.dateOfJoiningRaw.trim().isEmpty);
+
+    if (needsEnrichment(parsed)) {
+      Future<dynamic> safeProbe(String url) async {
+        try {
+          return await _client.get(url, timeout: const Duration(seconds: 6));
+        } catch (_) {
+          return null;
+        }
       }
-      try {
-        final extraRes = await _client.get(
-          url,
-          timeout: const Duration(seconds: 6),
-        );
+
+      final singleUrls = <String>[
+        endpoints.authProfile,
+        endpoints.usersProfile,
+        endpoints.profile,
+        if (parsed.id.isNotEmpty) endpoints.userDetail(parsed.id),
+        if (parsed.id.isNotEmpty) endpoints.staffDetail(parsed.id),
+        if (staffRefId.isNotEmpty && staffRefId != parsed.id)
+          endpoints.staffDetail(staffRefId),
+      ];
+
+      final probeResults = await Future.wait<dynamic>([
+        ...singleUrls.map(safeProbe),
+        safeProbe(endpoints.usersList),
+        safeProbe(endpoints.staffList),
+      ]);
+
+      // 1. Merge single-object profile responses
+      for (var i = 0; i < singleUrls.length; i++) {
+        final raw = probeResults[i];
+        if (raw == null || raw is! Map) continue;
         final extraObj = _mergeNonEmptyMap(
-          JsonParsers.extractObject(extraRes),
-          JsonParsers.asMap(extraRes),
+          JsonParsers.extractObject(raw),
+          JsonParsers.asMap(raw),
         );
         if (extraObj.isNotEmpty) {
           merged = _mergeNonEmptyMap(merged, extraObj);
           parsed = NurseUser.fromJson(merged);
         }
-      } catch (_) {}
-    }
+      }
 
-    // Enrich with `/api/staff` directory matching by ID, email, or employee code (`9008`)
-    // whenever photo OR any `Professional Info` field (`Head Nurse`, `General`, `Hospital Staff Certified`, `01/01/2024`, `Day`) is missing.
-    if (parsed.image == null ||
-        parsed.image!.trim().isEmpty ||
-        parsed.staffCode.isEmpty ||
-        parsed.department.isEmpty ||
-        parsed.designation.isEmpty ||
-        parsed.specialist.isEmpty ||
-        parsed.qualification.isEmpty ||
-        parsed.workShift.isEmpty ||
-        (parsed.dateOfJoining == null &&
-            parsed.dateOfJoiningRaw.trim().isEmpty)) {
-      try {
-        final staffRes = await _client.get(
-          endpoints.staffList,
-          timeout: const Duration(seconds: 6),
+      bool matchesPerson(Map<String, dynamic> item) {
+        final itemId = JsonParsers.asId(item['_id'] ?? item['id']);
+        final itemUserId = JsonParsers.asId(
+          item['user_id'] ?? item['userId'] ?? item['user'],
         );
-        final staffItems = JsonParsers.extractList(staffRes);
-        for (final s in staffItems) {
-          final sid = JsonParsers.asId(s['_id'] ?? s['id']);
-          final semail = JsonParsers.asString(s['email']).toLowerCase();
-          final scode = JsonParsers.asString(
-            s['employee_id'] ?? s['employeeId'] ?? s['staff_id'],
-          );
-          final matches = (parsed.id.isNotEmpty && sid == parsed.id) ||
-              (parsed.email.isNotEmpty &&
-                  semail == parsed.email.toLowerCase()) ||
-              (parsed.staffCode.isNotEmpty && scode == parsed.staffCode);
-          if (matches) {
+        final itemEmail = JsonParsers.asString(
+          item['email'] ?? item['username'],
+        ).toLowerCase();
+        final itemCode = JsonParsers.asString(
+          item['employee_id'] ?? item['employeeId'] ?? item['staff_id'],
+        );
+        final itemFullName =
+            '${JsonParsers.asString(item['name'])} ${JsonParsers.asString(item['surname'])}'
+                .trim()
+                .toLowerCase();
+        final targetName = parsed.fullName.trim().toLowerCase();
+
+        return (parsed.id.isNotEmpty &&
+                (itemId == parsed.id || itemUserId == parsed.id)) ||
+            (staffRefId.isNotEmpty && itemId == staffRefId) ||
+            (parsed.email.isNotEmpty &&
+                itemEmail.isNotEmpty &&
+                itemEmail == parsed.email.toLowerCase()) ||
+            (parsed.staffCode.isNotEmpty &&
+                itemCode.isNotEmpty &&
+                itemCode == parsed.staffCode) ||
+            (targetName.isNotEmpty &&
+                targetName != 'duty nurse' &&
+                itemFullName == targetName);
+      }
+
+      // 2. Match in `/api/users` list
+      final usersRes = probeResults[singleUrls.length];
+      if (usersRes != null) {
+        for (final u in JsonParsers.extractList(usersRes)) {
+          if (matchesPerson(u)) {
+            merged = _mergeNonEmptyMap(merged, u);
+            parsed = NurseUser.fromJson(merged);
+            break;
+          }
+        }
+      }
+
+      // 3. Match in `/api/staff` list (+ `/api/staff/:sid` detail if photo still missing)
+      final staffRes = probeResults[singleUrls.length + 1];
+      if (staffRes != null) {
+        for (final s in JsonParsers.extractList(staffRes)) {
+          if (matchesPerson(s)) {
+            final sid = JsonParsers.asId(s['_id'] ?? s['id']);
             merged = _mergeNonEmptyMap(merged, s);
             parsed = NurseUser.fromJson(merged);
-            // If list endpoint omitted large photo/image field, fetch full `/api/staff/:sid`
             if ((parsed.image == null || parsed.image!.trim().isEmpty) &&
                 sid.isNotEmpty &&
-                sid != parsed.id) {
-              try {
-                final detailRes = await _client.get(
-                  endpoints.staffDetail(sid),
-                  timeout: const Duration(seconds: 6),
-                );
+                sid != parsed.id &&
+                sid != staffRefId) {
+              final detailRes = await safeProbe(endpoints.staffDetail(sid));
+              if (detailRes is Map) {
                 final detailObj = _mergeNonEmptyMap(
                   JsonParsers.extractObject(detailRes),
                   JsonParsers.asMap(detailRes),
@@ -208,12 +252,23 @@ class NurseApiService {
                   merged = _mergeNonEmptyMap(merged, detailObj);
                   parsed = NurseUser.fromJson(merged);
                 }
-              } catch (_) {}
+              }
             }
             break;
           }
         }
-      } catch (_) {}
+      }
+    }
+
+    if (kDebugMode) {
+      final imgPreview = (parsed.image == null || parsed.image!.isEmpty)
+          ? 'NONE_ON_SERVER'
+          : (parsed.image!.length > 80
+              ? '${parsed.image!.substring(0, 80)}...(${parsed.image!.length} chars)'
+              : parsed.image!);
+      debugPrint(
+        '[ProfilePhotoSync] user="${parsed.fullName}" id="${parsed.id}" code="${parsed.staffCode}" image="$imgPreview"',
+      );
     }
 
     return parsed;
