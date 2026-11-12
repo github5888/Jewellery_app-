@@ -1258,7 +1258,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                                       ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        '${ipd.doctorName}  •  ${AppFormatters.formatSlashDate(ipd.admissionDate)}',
+                                        '${ipd.doctor.displayName}  •  ${AppFormatters.formatSlashDate(ipd.admissionDate)}',
                                         style: const TextStyle(
                                           color: AppColors.textSecondary,
                                           fontSize: 12,

@@ -1021,6 +1021,8 @@ class IpdAdmission {
     return wardAndBedLabel;
   }
 
+  String get doctorName => doctor.displayName;
+
   /// Computes clinical badge label directly from real patient status, emergency flags, and latest vitals.
   String get clinicalStatusLabel {
     if (isDischarged) return 'Discharged';

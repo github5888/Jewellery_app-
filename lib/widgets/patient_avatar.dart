@@ -262,31 +262,6 @@ class _PatientAvatarState extends State<PatientAvatar> {
       );
     }
 
-    // Also try direct Image.network on primary candidate while async probe runs
-    final directUrl = AppConfig.resolveMediaUrl(
-      widget.baseUrl,
-      widget.imagePath,
-    );
-    if (directUrl != null && !directUrl.startsWith('data:image/')) {
-      return Container(
-        width: diameter,
-        height: diameter,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: bg,
-          border: Border.all(color: AppColors.border, width: 1.2),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Image.network(
-          directUrl,
-          width: diameter,
-          height: diameter,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildInitialsText(initials, fg),
-        ),
-      );
-    }
-
     return _buildInitialsCircle(initials, bg, fg, diameter);
   }
 
