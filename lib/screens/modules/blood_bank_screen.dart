@@ -264,7 +264,7 @@ class _BloodBankScreenState extends State<BloodBankScreen> {
                 crossAxisCount: 2,
                 mainAxisSpacing: 12,
                 crossAxisSpacing: 12,
-                childAspectRatio: 1.22,
+                mainAxisExtent: 128,
               ),
               itemBuilder: (context, index) {
                 return _BloodGroupStockCard(item: groups[index]);

@@ -70,6 +70,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
     }
     try {
       final fetched = await ctrl.api.fetchFullPatientDossier(_patient);
+      ctrl.updateCachedPatientRecord(fetched.patient);
       if (!mounted) return;
       setState(() {
         _dossier = fetched;
@@ -1038,7 +1039,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 3 — VISITS / OPD & IPD (image-32)
+  // TAB 3 — VISITS / OPD & IPD (`Screenshot 779`)
   // ---------------------------------------------------------------------------
   Widget _buildVisitsOpdIpdTab(PatientFullDossier? d) {
     final opdList = d?.opdEncounters ?? const <PatientOpdEncounter>[];
@@ -1049,6 +1050,21 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       children: [
         _SectionCard(
           title: 'OPD Consultations & Encounters',
+          trailingHeader: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE0F2FE),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${opdList.length} Records',
+              style: const TextStyle(
+                color: Color(0xFF0369A1),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
           child: opdList.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 22),
@@ -1063,146 +1079,235 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
                     ),
                   ),
                 )
-              : SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(minWidth: 580),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 10,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.divider),
-                          ),
-                          child: const Row(
-                            children: [
-                              SizedBox(
-                                width: 95,
-                                child: Text('OPD NO', style: _tableHeaderStyle),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final tableWidth = constraints.maxWidth > 660
+                        ? constraints.maxWidth
+                        : 660.0;
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: tableWidth,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
                               ),
-                              SizedBox(
-                                width: 115,
-                                child: Text('CASE REF', style: _tableHeaderStyle),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.divider),
                               ),
-                              SizedBox(
-                                width: 95,
-                                child: Text('DATE', style: _tableHeaderStyle),
+                              child: const Row(
+                                children: [
+                                  SizedBox(
+                                    width: 92,
+                                    child: Text(
+                                      'OPD NO',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 115,
+                                    child: Text(
+                                      'CASE REF',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 92,
+                                    child: Text(
+                                      'DATE',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      'DOCTOR',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      'CHARGE',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 80,
+                                    child: Text(
+                                      'PAID',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                  SizedBox(
+                                    width: 86,
+                                    child: Text(
+                                      'STATUS',
+                                      style: _tableHeaderStyle,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              Expanded(
-                                child: Text('DOCTOR', style: _tableHeaderStyle),
+                            ),
+                            ...opdList.map(
+                              (o) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                decoration: const BoxDecoration(
+                                  border: Border(
+                                    bottom:
+                                        BorderSide(color: AppColors.divider),
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 92,
+                                      child: Text(
+                                        o.opdNo,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Color(0xFF00779E),
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: AppTheme.tabularNums,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 115,
+                                      child: Text(
+                                        o.caseRef.isEmpty ? '—' : o.caseRef,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: AppTheme.tabularNums,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 92,
+                                      child: Text(
+                                        AppFormatters.formatSlashDate(o.date),
+                                        style: const TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w600,
+                                          fontFeatures: AppTheme.tabularNums,
+                                        ),
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Padding(
+                                        padding:
+                                            const EdgeInsets.only(right: 8),
+                                        child: Text(
+                                          o.doctorName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: AppColors.textPrimary,
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        AppFormatters.formatCurrencyInr(
+                                          o.charge,
+                                        ),
+                                        style: const TextStyle(
+                                          color: AppColors.textPrimary,
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: AppTheme.tabularNums,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 80,
+                                      child: Text(
+                                        AppFormatters.formatCurrencyInr(o.paid),
+                                        style: const TextStyle(
+                                          color: Color(0xFF059669),
+                                          fontSize: 12.5,
+                                          fontWeight: FontWeight.w800,
+                                          fontFeatures: AppTheme.tabularNums,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(
+                                      width: 86,
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 3,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.successSoft,
+                                            borderRadius:
+                                                BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            o.status.isEmpty
+                                                ? 'Completed'
+                                                : o.status,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Color(0xFF059669),
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w800,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              SizedBox(
-                                width: 85,
-                                child: Text('CHARGE', style: _tableHeaderStyle),
-                              ),
-                              SizedBox(
-                                width: 85,
-                                child: Text('PAID', style: _tableHeaderStyle),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        ...opdList.map(
-                          (o) => Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                            decoration: const BoxDecoration(
-                              border: Border(
-                                bottom: BorderSide(color: AppColors.divider),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 95,
-                                  child: Text(
-                                    o.opdNo,
-                                    style: const TextStyle(
-                                      color: Color(0xFF00779E),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 115,
-                                  child: Text(
-                                    o.caseRef.isEmpty ? '—' : o.caseRef,
-                                    style: const TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w600,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 95,
-                                  child: Text(
-                                    AppFormatters.formatSlashDate(o.date),
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w600,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: Text(
-                                    o.doctorName,
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 85,
-                                  child: Text(
-                                    AppFormatters.formatCurrencyInr(o.charge),
-                                    style: const TextStyle(
-                                      color: AppColors.textPrimary,
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                                SizedBox(
-                                  width: 85,
-                                  child: Text(
-                                    AppFormatters.formatCurrencyInr(o.paid),
-                                    style: const TextStyle(
-                                      color: Color(0xFF059669),
-                                      fontSize: 12.5,
-                                      fontWeight: FontWeight.w800,
-                                      fontFeatures: AppTheme.tabularNums,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
         ),
         const SizedBox(height: 14),
         _SectionCard(
           title: 'IPD Admissions',
+          trailingHeader: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDE9FE),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${ipdList.length} Admissions',
+              style: const TextStyle(
+                color: Color(0xFF6D28D9),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
           child: ipdList.isEmpty
               ? const Padding(
                   padding: EdgeInsets.symmetric(vertical: 22),
@@ -1309,7 +1414,7 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
   }
 
   // ---------------------------------------------------------------------------
-  // TAB 4 — SERVICES & ORDERS (image-33)
+  // TAB 4 — SERVICES & ORDERS (`Screenshot 780`)
   // ---------------------------------------------------------------------------
   Widget _buildServicesAndOrdersTab(PatientFullDossier? d) {
     final orders = d?.serviceOrders ?? const <PatientServiceOrderItem>[];
@@ -1317,153 +1422,170 @@ class _PatientDetailScreenState extends State<PatientDetailScreen> {
       title: 'Linked Orders & Investigation Services',
       subtitle:
           'All tests, medicine prescriptions and blood bank issues linked to this patient.',
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minWidth: 600),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.divider),
-                ),
-                child: const Row(
-                  children: [
-                    SizedBox(
-                      width: 110,
-                      child: Text(
-                        'SERVICE TYPE',
-                        style: _tableHeaderStyle,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 145,
-                      child: Text(
-                        'INVOICE / BILL REFERENCE',
-                        style: _tableHeaderStyle,
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'DESCRIPTION / TEST NAME',
-                        style: _tableHeaderStyle,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 90,
-                      child: Text(
-                        'AMOUNT',
-                        style: _tableHeaderStyle,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 85,
-                      child: Text(
-                        'STATUS',
-                        style: _tableHeaderStyle,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (orders.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 26),
-                  child: Center(
-                    child: Text(
-                      'No linked orders or investigation services recorded.',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                )
-              else
-                ...orders.map(
-                  (o) => Container(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final tableWidth =
+              constraints.maxWidth > 620 ? constraints.maxWidth : 620.0;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: tableWidth,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
-                      vertical: 12,
+                      vertical: 10,
                     ),
-                    decoration: const BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.divider),
-                      ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.divider),
                     ),
-                    child: Row(
+                    child: const Row(
                       children: [
                         SizedBox(
                           width: 110,
                           child: Text(
-                            o.serviceType,
-                            style: const TextStyle(
-                              color: Color(0xFF00779E),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            'SERVICE TYPE',
+                            style: _tableHeaderStyle,
                           ),
                         ),
                         SizedBox(
-                          width: 145,
+                          width: 150,
                           child: Text(
-                            o.billReference,
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              fontFeatures: AppTheme.tabularNums,
-                            ),
+                            'INVOICE / BILL REFERENCE',
+                            style: _tableHeaderStyle,
                           ),
                         ),
                         Expanded(
                           child: Text(
-                            o.description,
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            'DESCRIPTION / TEST NAME',
+                            style: _tableHeaderStyle,
                           ),
                         ),
                         SizedBox(
                           width: 90,
                           child: Text(
-                            AppFormatters.formatCurrencyInr(o.amount),
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w800,
-                              fontFeatures: AppTheme.tabularNums,
-                            ),
+                            'AMOUNT',
+                            style: _tableHeaderStyle,
                           ),
                         ),
                         SizedBox(
                           width: 85,
                           child: Text(
-                            o.status,
-                            style: const TextStyle(
-                              color: Color(0xFF059669),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w800,
-                            ),
+                            'STATUS',
+                            style: _tableHeaderStyle,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-            ],
-          ),
-        ),
+                  if (orders.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 28),
+                      child: Center(
+                        child: Text(
+                          'No clinical services, tests, or pharmacy orders linked to this patient yet.',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...orders.map(
+                      (o) => Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(color: AppColors.divider),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 110,
+                              child: Text(
+                                o.serviceType,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF00779E),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 150,
+                              child: Text(
+                                o.billReference,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  fontFeatures: AppTheme.tabularNums,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  o.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 90,
+                              child: Text(
+                                AppFormatters.formatCurrencyInr(o.amount),
+                                style: const TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w800,
+                                  fontFeatures: AppTheme.tabularNums,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 85,
+                              child: Text(
+                                o.status,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF059669),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }

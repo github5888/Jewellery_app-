@@ -40,6 +40,10 @@ class ApiEndpoints {
   String get patients => _url('/api/patients');
   String patientDetail(String patientId) => _url('/api/patients/$patientId');
   String patientAbha(String patientId) => _url('/api/patients/$patientId/abha');
+  String patientAbhaCard(String patientId) =>
+      _url('/api/patients/$patientId/abha-card');
+  String abhaPatient(String patientId) => _url('/api/abha/patient/$patientId');
+  String abhaCard(String patientId) => _url('/api/abha/card/$patientId');
   String get abha => _url('/api/abha');
   String get abhaScanShare => _url('/api/abha/scan-share');
   String abhaScanShareItem(String id) => _url('/api/abha/scan-share/$id');
@@ -53,9 +57,15 @@ class ApiEndpoints {
   String get abhaCheckins => _url('/api/abha/checkins');
   String get abhaQueue => _url('/api/abha/queue');
   String get abhaAadhaarGenerateOtp => _url('/api/abha/aadhaar/generate-otp');
+  String get abhaM1AadhaarGenerateOtp =>
+      _url('/api/abha/m1/aadhaar/generate-otp');
   String get abhaAadhaarVerifyOtp => _url('/api/abha/aadhaar/verify-otp');
+  String get abhaM1AadhaarVerifyOtp => _url('/api/abha/m1/aadhaar/verify-otp');
   String get abhaMobileGenerateOtp => _url('/api/abha/mobile/generate-otp');
+  String get abhaM1MobileGenerateOtp =>
+      _url('/api/abha/m1/mobile/generate-otp');
   String get abhaMobileVerifyOtp => _url('/api/abha/mobile/verify-otp');
+  String get abhaM1MobileVerifyOtp => _url('/api/abha/m1/mobile/verify-otp');
   String get abhaSearch => _url('/api/abha/search');
   String get abhaAddressGenerateOtp => _url('/api/abha/address/generate-otp');
   String get abhaAddressVerifyOtp => _url('/api/abha/address/verify-otp');
@@ -120,6 +130,8 @@ class ApiEndpoints {
   String get billing => _url('/api/billing');
   String get invoices => _url('/api/invoices');
   String get payments => _url('/api/payments');
+  String get ambulance => _url('/api/ambulance');
+  String get ambulanceCalls => _url('/api/ambulance/calls');
   String get bloodBankIssues => _url('/api/blood-bank/issues');
   String get bloodBankAltIssues => _url('/api/bloodbank/issues');
   String get pathology => _url('/api/pathology');

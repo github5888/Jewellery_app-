@@ -227,16 +227,29 @@ class _DischargeCardPreviewDialogState
     </ul>
   </div>
   <div class="note">Follow-up appointment required as noted. In case of acute distress, report immediately to Hospital Emergency.</div>
+  <div style="display:flex;justify-content:space-between;margin-top:34px;padding-top:8px;font-size:12px;">
+    <div style="text-align:center;min-width:190px;border-top:1px solid #94a3b8;padding-top:6px;">
+      <b>Attending Doctor Signature</b><br/>
+      <span style="color:#64748b;font-size:11px;">(${esc(_consultantRawName(ipd))})</span>
+    </div>
+    <div style="text-align:center;min-width:190px;border-top:1px solid #94a3b8;padding-top:6px;">
+      <b>Patient / Attendant Signature</b><br/>
+      <span style="color:#64748b;font-size:11px;">(Acknowledged Discharge &amp; Meds)</span>
+    </div>
+  </div>
+  <div style="text-align:center;color:#94a3b8;font-size:10.5px;margin-top:18px;border-top:1px dashed #e2e8f0;padding-top:8px;">
+    Computer generated official hospital discharge summary &bull; ${esc(hospTitle)}
+  </div>
 </body>
 </html>
 ''';
 
-    final printedOnWeb = await PrintDocumentHelper.printHtmlDocument(
-      title: 'Discharge Card - ${ipd.ipdNo}',
+    final printedOk = await PrintDocumentHelper.printHtmlDocument(
+      title: 'Discharge_Card_${ipd.ipdNo}',
       htmlContent: htmlDoc,
     );
 
-    if (!printedOnWeb && mounted) {
+    if (!printedOk && mounted) {
       final plainSummary = [
         '$hospTitle — DISCHARGE CARD (${ipd.ipdNo})',
         'Patient: ${pat.patientName} (UHID: ${pat.patientUniqueId})',
@@ -252,7 +265,7 @@ class _DischargeCardPreviewDialogState
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'A4 Discharge Card prepared (summary copied for sharing/printing).',
+            'Rebuild app once to open native Android PDF Printer (summary copied to clipboard).',
           ),
           backgroundColor: Color(0xFF035C7A),
         ),
@@ -302,34 +315,34 @@ class _DischargeCardPreviewDialogState
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top Preview Bar (`image-38.png`)
+            // Top Preview Bar (`Screenshot 781`)
             Container(
               color: const Color(0xFF035C7A),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Wrap(
                 alignment: WrapAlignment.spaceBetween,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
                     children: [
                       const Icon(
                         Icons.description_outlined,
                         color: Colors.white,
                         size: 19,
                       ),
-                      const SizedBox(width: 8),
                       const Text(
                         'Discharge Card Preview',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 15,
+                          fontSize: 14.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
@@ -350,8 +363,9 @@ class _DischargeCardPreviewDialogState
                       ),
                     ],
                   ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       ElevatedButton.icon(
                         onPressed: _handlePrint,
@@ -360,7 +374,7 @@ class _DischargeCardPreviewDialogState
                           foregroundColor: const Color(0xFF035C7A),
                           elevation: 0,
                           minimumSize: const Size(0, 34),
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 11),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -369,12 +383,11 @@ class _DischargeCardPreviewDialogState
                         label: const Text(
                           'Print Discharge Card',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
                       OutlinedButton.icon(
                         onPressed: () => Navigator.of(context).pop(),
                         style: OutlinedButton.styleFrom(
@@ -390,7 +403,7 @@ class _DischargeCardPreviewDialogState
                         label: const Text(
                           'Close',
                           style: TextStyle(
-                            fontSize: 12,
+                            fontSize: 11.5,
                             fontWeight: FontWeight.w800,
                           ),
                         ),
@@ -779,7 +792,7 @@ class _DischargeCardPreviewDialogState
 
                     const SizedBox(height: 12),
 
-                    // Blue Left-Bordered Emergency Notice (`image-39.png`)
+                    // Blue Left-Bordered Emergency Notice (`Screenshot 782`)
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -803,6 +816,82 @@ class _DischargeCardPreviewDialogState
                         ),
                       ),
                     ),
+
+                    const SizedBox(height: 24),
+
+                    // Signature Block (`Screenshot 782`)
+                    Wrap(
+                      alignment: WrapAlignment.spaceBetween,
+                      spacing: 16,
+                      runSpacing: 16,
+                      children: [
+                        SizedBox(
+                          width: 200,
+                          child: Column(
+                            children: [
+                              const Divider(color: Color(0xFFCBD5E1)),
+                              const Text(
+                                'Attending Doctor Signature',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '(${_consultantRawName(ipd)})',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(
+                          width: 210,
+                          child: const Column(
+                            children: [
+                              Divider(color: Color(0xFFCBD5E1)),
+                              Text(
+                                'Patient / Attendant Signature',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.textPrimary,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                '(Acknowledged Discharge & Meds)',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 14),
+                    Text(
+                      'Computer generated official hospital discharge summary • $hospTitle',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -810,44 +899,22 @@ class _DischargeCardPreviewDialogState
 
             const Divider(height: 1, color: AppColors.divider),
 
-            // Bottom Action Bar (`Print Discharge Card (A4)` + `Close` — image-38 & 39)
+            // Bottom Action Bar (`Print Discharge Card (A4)` + `Close` — overflow-safe Wrap)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
                 children: [
-                  ElevatedButton.icon(
-                    onPressed: _handlePrint,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF035C7A),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    icon: const Icon(Icons.print_outlined, size: 17),
-                    label: const Text(
-                      'Print Discharge Card (A4)',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
                   OutlinedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textPrimary,
                       side: const BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 11,
+                        horizontal: 14,
+                        vertical: 10,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -856,7 +923,30 @@ class _DischargeCardPreviewDialogState
                     child: const Text(
                       'Close',
                       style: TextStyle(
-                        fontSize: 12.5,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _handlePrint,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF035C7A),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Icons.print_outlined, size: 16),
+                    label: const Text(
+                      'Print Discharge Card (A4)',
+                      style: TextStyle(
+                        fontSize: 12,
                         fontWeight: FontWeight.w800,
                       ),
                     ),

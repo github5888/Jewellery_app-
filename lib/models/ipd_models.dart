@@ -106,10 +106,20 @@ class PatientProfile {
         json['address'] ?? fallbackParent['address'],
       ),
       abhaNumber: JsonParsers.asString(
-        json['abha_number'] ?? fallbackParent['abha_number'],
+        json['abha_number'] ??
+            json['abhaNumber'] ??
+            json['abha_id'] ??
+            json['abhaId'] ??
+            fallbackParent['abha_number'] ??
+            fallbackParent['abhaNumber'] ??
+            fallbackParent['abha_id'],
       ),
       abhaAddress: JsonParsers.asString(
-        json['abha_address'] ?? fallbackParent['abha_address'],
+        json['abha_address'] ??
+            json['abhaAddress'] ??
+            json['health_id'] ??
+            fallbackParent['abha_address'] ??
+            fallbackParent['abhaAddress'],
       ),
     );
   }
@@ -1037,8 +1047,24 @@ class IpdAdmission {
   }
 
   factory IpdAdmission.fromJson(Map<String, dynamic> raw) {
-    final json = JsonParsers.extractObject(raw);
+    final extracted = JsonParsers.extractObject(raw);
+    final nestedIpd = extracted['ipd'] is Map
+        ? JsonParsers.asMap(extracted['ipd'])
+        : (extracted['admission'] is Map
+            ? JsonParsers.asMap(extracted['admission'])
+            : <String, dynamic>{});
+    final json = nestedIpd.isNotEmpty
+        ? <String, dynamic>{...extracted, ...nestedIpd}
+        : extracted;
     final id = JsonParsers.asId(json['_id'] ?? json['id']);
+
+    final dischargeSub = json['discharge'] is Map
+        ? JsonParsers.asMap(json['discharge'])
+        : (json['discharge_details'] is Map
+            ? JsonParsers.asMap(json['discharge_details'])
+            : (json['dischargeDetails'] is Map
+                ? JsonParsers.asMap(json['dischargeDetails'])
+                : <String, dynamic>{}));
 
     final patientMap = json['patient'] is Map
         ? JsonParsers.asMap(json['patient'])
@@ -1133,13 +1159,18 @@ class IpdAdmission {
         : <String, dynamic>{};
 
     final rawDischargeStatus = JsonParsers.asString(
-      json['discharge_status'] ?? json['status'],
+      json['discharge_status'] ?? dischargeSub['status'] ?? json['status'],
     );
     final dischargedBool = JsonParsers.asBool(
-      json['is_discharged'] ?? json['discharged'],
+      json['is_discharged'] ?? json['discharged'] ?? dischargeSub['discharged'],
     );
     final dischargeDt = JsonParsers.asDateTime(
-      json['discharge_date'] ?? json['discharged_at'],
+      json['discharge_date'] ??
+          json['discharged_at'] ??
+          json['dischargeDate'] ??
+          dischargeSub['date'] ??
+          dischargeSub['discharge_date'] ??
+          dischargeSub['discharged_at'],
     );
 
     final dueVal = json['due_amount'] ??
@@ -1207,7 +1238,10 @@ class IpdAdmission {
       provisionalDiagnosis: JsonParsers.asString(
         json['provisional_diagnosis'] ??
             json['provisionalDiagnosis'] ??
-            json['diagnosis'],
+            json['final_diagnosis'] ??
+            json['finalDiagnosis'] ??
+            json['diagnosis'] ??
+            dischargeSub['diagnosis'],
       ),
       presentingComplaint: JsonParsers.asString(
         json['presenting_complaint'] ??
@@ -1215,17 +1249,29 @@ class IpdAdmission {
             json['symptoms'] ??
             json['symptoms_description'] ??
             json['symptoms_title'] ??
+            json['reason_for_admission'] ??
             json['reason'] ??
             json['note'],
       ),
       clinicalSummary: JsonParsers.asString(
-        json['clinical_summary'] ??
-            json['clinicalSummary'] ??
+        json['doctor_discharge_summary'] ??
+            json['doctorDischargeSummary'] ??
+            json['doctor_discharge_note'] ??
+            json['discharge_note'] ??
+            json['dischargeNote'] ??
+            json['discharge_remarks'] ??
+            json['dischargeRemarks'] ??
             json['discharge_summary'] ??
             json['dischargeSummary'] ??
+            json['clinical_summary'] ??
+            json['clinicalSummary'] ??
             json['inpatient_course'] ??
             json['summary'] ??
-            json['discharge_note'] ??
+            dischargeSub['summary'] ??
+            dischargeSub['note'] ??
+            dischargeSub['remarks'] ??
+            dischargeSub['discharge_note'] ??
+            json['remarks'] ??
             json['note'],
       ),
       dischargeInstructions: JsonParsers.asString(
@@ -1234,7 +1280,10 @@ class IpdAdmission {
             json['post_discharge_instructions'] ??
             json['follow_up_instructions'] ??
             json['advice'] ??
-            json['follow_up'],
+            json['follow_up'] ??
+            dischargeSub['instructions'] ??
+            dischargeSub['advice'] ??
+            dischargeSub['follow_up'],
       ),
       referringDoctor: JsonParsers.asString(
         json['referring_doctor'] ??

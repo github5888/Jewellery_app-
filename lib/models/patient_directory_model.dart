@@ -59,39 +59,84 @@ class PatientDirectoryRecord {
       abhaNumber.trim().isNotEmpty || abhaAddress.trim().isNotEmpty;
 
   PatientDirectoryRecord copyWith({
+    String? id,
+    String? patientUniqueId,
+    String? patientName,
+    int? age,
+    DateTime? dob,
+    String? gender,
+    String? bloodGroup,
+    String? phone,
+    String? email,
+    String? address,
+    String? guardianName,
+    String? guardianRelation,
+    String? maritalStatus,
+    String? knownAllergies,
+    String? tpaInsurance,
     String? abhaNumber,
     String? abhaAddress,
+    double? dueBalance,
+    double? totalInvoiced,
+    double? totalPaid,
+    bool? isDisabled,
+    String? image,
   }) {
     return PatientDirectoryRecord(
-      id: id,
-      patientUniqueId: patientUniqueId,
-      patientName: patientName,
-      age: age,
-      dob: dob,
-      gender: gender,
-      bloodGroup: bloodGroup,
-      phone: phone,
-      email: email,
-      address: address,
-      guardianName: guardianName,
-      guardianRelation: guardianRelation,
-      maritalStatus: maritalStatus,
-      knownAllergies: knownAllergies,
-      tpaInsurance: tpaInsurance,
+      id: id ?? this.id,
+      patientUniqueId: patientUniqueId ?? this.patientUniqueId,
+      patientName: patientName ?? this.patientName,
+      age: age ?? this.age,
+      dob: dob ?? this.dob,
+      gender: gender ?? this.gender,
+      bloodGroup: bloodGroup ?? this.bloodGroup,
+      phone: phone ?? this.phone,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      guardianName: guardianName ?? this.guardianName,
+      guardianRelation: guardianRelation ?? this.guardianRelation,
+      maritalStatus: maritalStatus ?? this.maritalStatus,
+      knownAllergies: knownAllergies ?? this.knownAllergies,
+      tpaInsurance: tpaInsurance ?? this.tpaInsurance,
       abhaNumber: abhaNumber ?? this.abhaNumber,
       abhaAddress: abhaAddress ?? this.abhaAddress,
-      dueBalance: dueBalance,
-      totalInvoiced: totalInvoiced,
-      totalPaid: totalPaid,
-      isDisabled: isDisabled,
-      image: image,
+      dueBalance: dueBalance ?? this.dueBalance,
+      totalInvoiced: totalInvoiced ?? this.totalInvoiced,
+      totalPaid: totalPaid ?? this.totalPaid,
+      isDisabled: isDisabled ?? this.isDisabled,
+      image: image ?? this.image,
     );
   }
 
-  factory PatientDirectoryRecord.fromJson(Map<String, dynamic> json) {
-    final img = JsonParsers.asString(json['image'] ?? json['photo']);
+  factory PatientDirectoryRecord.fromJson(Map<String, dynamic> rawJson) {
+    final nestedPat = rawJson['patient'] is Map
+        ? JsonParsers.asMap(rawJson['patient'])
+        : <String, dynamic>{};
+    final json = nestedPat.isNotEmpty
+        ? <String, dynamic>{...rawJson, ...nestedPat}
+        : rawJson;
+
+    final abhaObj = json['abha'] is Map
+        ? JsonParsers.asMap(json['abha'])
+        : (json['abha_profile'] is Map
+            ? JsonParsers.asMap(json['abha_profile'])
+            : (json['abhaProfile'] is Map
+                ? JsonParsers.asMap(json['abhaProfile'])
+                : (json['abdm'] is Map
+                    ? JsonParsers.asMap(json['abdm'])
+                    : (json['abha_card'] is Map
+                        ? JsonParsers.asMap(json['abha_card'])
+                        : <String, dynamic>{}))));
+
+    final img = JsonParsers.asString(
+      json['image'] ?? json['photo'] ?? abhaObj['photo'],
+    );
     final dob = JsonParsers.asDateTime(
-      json['dob'] ?? json['date_of_birth'] ?? json['dateOfBirth'],
+      json['dob'] ??
+          json['date_of_birth'] ??
+          json['dateOfBirth'] ??
+          abhaObj['dob'] ??
+          abhaObj['dateOfBirth'],
     );
     int age = JsonParsers.asInt(json['age'] ?? json['age_years']);
     if (age <= 0 && dob != null) {
@@ -109,7 +154,11 @@ class PatientDirectoryRecord {
     }
 
     final first = JsonParsers.asString(
-      json['patient_name'] ?? json['patientName'] ?? json['name'],
+      json['patient_name'] ??
+          json['patientName'] ??
+          json['name'] ??
+          abhaObj['name'] ??
+          abhaObj['patient_name'],
     );
     final last = JsonParsers.asString(json['surname'] ?? json['last_name']);
     final combined =
@@ -117,18 +166,56 @@ class PatientDirectoryRecord {
             ? '$first $last'.trim()
             : first;
 
+    final rawAbhaNumber = JsonParsers.asString(
+      json['abha_number'] ??
+          json['abhaNumber'] ??
+          json['abha_no'] ??
+          json['abhaNo'] ??
+          json['abha_id'] ??
+          json['abhaId'] ??
+          json['health_id_number'] ??
+          json['healthIdNumber'] ??
+          abhaObj['abha_number'] ??
+          abhaObj['abhaNumber'] ??
+          abhaObj['abha_no'] ??
+          abhaObj['abha_id'] ??
+          abhaObj['abhaId'] ??
+          abhaObj['health_id_number'] ??
+          abhaObj['healthIdNumber'] ??
+          abhaObj['number'],
+    );
+    final rawAbhaAddress = JsonParsers.asString(
+      json['abha_address'] ??
+          json['abhaAddress'] ??
+          json['phr_address'] ??
+          json['phrAddress'] ??
+          json['health_id'] ??
+          json['healthId'] ??
+          abhaObj['abha_address'] ??
+          abhaObj['abhaAddress'] ??
+          abhaObj['phr_address'] ??
+          abhaObj['phrAddress'] ??
+          abhaObj['health_id'] ??
+          abhaObj['healthId'] ??
+          abhaObj['address'],
+    );
+
     return PatientDirectoryRecord(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       patientUniqueId: JsonParsers.asString(
         json['patient_unique_id'] ??
             json['patientUniqueId'] ??
             json['uhid'] ??
+            json['patient_code'] ??
             json['patient_id'],
       ),
       patientName: combined.isNotEmpty ? combined : '—',
       age: age,
       dob: dob,
-      gender: JsonParsers.asString(json['gender'], fallback: '—'),
+      gender: JsonParsers.asString(
+        json['gender'] ?? abhaObj['gender'],
+        fallback: '—',
+      ),
       bloodGroup: JsonParsers.asString(
         json['blood_group'] ?? json['bloodGroup'],
       ),
@@ -137,7 +224,9 @@ class PatientDirectoryRecord {
             json['mobile_no'] ??
             json['mobileNo'] ??
             json['phone'] ??
-            json['mobile'],
+            json['mobile'] ??
+            abhaObj['mobile'] ??
+            abhaObj['mobileno'],
       ),
       email: JsonParsers.asString(json['email'] ?? json['email_address']),
       address: JsonParsers.asString(
@@ -165,12 +254,8 @@ class PatientDirectoryRecord {
             json['organisation_name'] ??
             json['insurance'],
       ),
-      abhaNumber: JsonParsers.asString(
-        json['abha_number'] ?? json['abhaNumber'] ?? json['abha_no'],
-      ),
-      abhaAddress: JsonParsers.asString(
-        json['abha_address'] ?? json['abhaAddress'],
-      ),
+      abhaNumber: rawAbhaNumber,
+      abhaAddress: rawAbhaAddress,
       dueBalance: JsonParsers.asDouble(
         json['due_balance'] ??
             json['dueBalance'] ??
@@ -217,16 +302,21 @@ class PatientOpdEncounter {
     final rawDoc = json['doctor'] ??
         json['cons_doctor'] ??
         json['consultant_doctor'] ??
-        json['consultantDoctor'];
+        json['consultantDoctor'] ??
+        json['consultant'] ??
+        json['doctor_id'];
     if (rawDoc is Map) {
       final dm = JsonParsers.asMap(rawDoc);
       docName = AppFormatters.formatDoctorName(
-        JsonParsers.asString(dm['name']),
-        JsonParsers.asString(dm['surname']),
+        JsonParsers.asString(dm['name'] ?? dm['doctor_name']),
+        JsonParsers.asString(dm['surname'] ?? dm['last_name']),
       );
     } else {
       final s = JsonParsers.asString(
-        json['doctor_name'] ?? json['doctorName'] ?? rawDoc,
+        json['doctor_name'] ??
+            json['doctorName'] ??
+            json['consultant_name'] ??
+            rawDoc,
       );
       if (s.isNotEmpty) docName = AppFormatters.formatDoctorName(s);
     }
@@ -237,12 +327,18 @@ class PatientOpdEncounter {
           json['amount'] ??
           json['charge'] ??
           json['net_amount'] ??
-          json['total_amount'],
+          json['total_amount'] ??
+          json['total'] ??
+          json['consultation_fee'] ??
+          json['doctor_fee'] ??
+          json['fee'],
     );
     final paidVal = JsonParsers.asDouble(
       json['paid_amount'] ??
           json['paidAmount'] ??
           json['paid'] ??
+          json['amount_paid'] ??
+          json['payment_amount'] ??
           (JsonParsers.asString(json['payment_status']).toLowerCase() == 'paid'
               ? chargeVal
               : null),
@@ -252,25 +348,37 @@ class PatientOpdEncounter {
     return PatientOpdEncounter(
       id: JsonParsers.asId(json['_id'] ?? json['id']),
       opdNo: JsonParsers.asString(
-        json['opd_no'] ?? json['opdNo'],
+        json['opd_no'] ??
+            json['opdNo'] ??
+            json['opd_id'] ??
+            json['visit_no'] ??
+            json['token_no'],
         fallback: 'OPD',
       ),
       caseRef: JsonParsers.asString(
         json['case_reference_id'] ??
             json['caseReferenceId'] ??
             json['case_id'] ??
-            json['caseRef'],
+            json['caseId'] ??
+            json['caseRef'] ??
+            json['case_no'],
       ),
       date: JsonParsers.asDateTime(
         json['appointment_date'] ??
             json['appointmentDate'] ??
+            json['visit_date'] ??
+            json['visitDate'] ??
+            json['opd_date'] ??
             json['date'] ??
             json['createdAt'],
       ),
       doctorName: docName.isEmpty ? '—' : docName,
       charge: chargeVal,
       paid: paidVal,
-      status: JsonParsers.asString(json['status'], fallback: 'Completed'),
+      status: JsonParsers.asString(
+        json['status'] ?? json['opd_status'] ?? json['visit_status'],
+        fallback: 'Completed',
+      ),
     );
   }
 }
@@ -354,6 +462,60 @@ class PatientServiceOrderItem {
     required this.status,
     this.date,
   });
+
+  factory PatientServiceOrderItem.fromJson(
+    Map<String, dynamic> json, {
+    String fallbackType = 'Service',
+  }) {
+    return PatientServiceOrderItem(
+      id: JsonParsers.asId(json['_id'] ?? json['id']),
+      serviceType: JsonParsers.asString(
+        json['service_type'] ??
+            json['serviceType'] ??
+            json['module'] ??
+            json['category'] ??
+            json['charge_type'] ??
+            json['type'],
+        fallback: fallbackType,
+      ),
+      billReference: JsonParsers.asString(
+        json['bill_no'] ??
+            json['billNo'] ??
+            json['invoice_no'] ??
+            json['invoiceNo'] ??
+            json['reference_no'] ??
+            json['order_no'],
+        fallback: 'ORD',
+      ),
+      description: JsonParsers.asString(
+        json['description'] ??
+            json['test_name'] ??
+            json['testName'] ??
+            json['charge_name'] ??
+            json['medicine_name'] ??
+            json['service_name'] ??
+            json['title'] ??
+            json['name'] ??
+            json['note'],
+        fallback: 'Clinical Service / Order',
+      ),
+      amount: JsonParsers.asDouble(
+        json['net_amount'] ??
+            json['total_amount'] ??
+            json['applied_charge'] ??
+            json['standard_charge'] ??
+            json['total'] ??
+            json['amount'],
+      ),
+      status: JsonParsers.asString(
+        json['status'] ?? json['payment_status'] ?? json['report_status'],
+        fallback: 'Completed',
+      ),
+      date: JsonParsers.asDateTime(
+        json['date'] ?? json['order_date'] ?? json['createdAt'],
+      ),
+    );
+  }
 }
 
 /// Invoice row inside Patient Profile -> `Overview` (`Recent Invoices` — image-29)

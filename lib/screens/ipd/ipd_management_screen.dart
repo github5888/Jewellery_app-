@@ -367,65 +367,83 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(18),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    ipd.ipdNo,
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: AppTheme.tabularNums,
-                    ),
-                  ),
-                ),
-                if (ipd.caseReferenceId.isNotEmpty) ...[
-                  const SizedBox(width: 7),
-                  Text(
-                    'Case #${ipd.caseReferenceId}',
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4.5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(16),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: primaryColor.withAlpha(36)),
-                  ),
+                Expanded(
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
-                        Icons.hotel_rounded,
-                        size: 13,
-                        color: primaryColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        ipd.wardAndBedLabel,
-                        style: TextStyle(
-                          color: primaryColor,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withAlpha(18),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          ipd.ipdNo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: AppTheme.tabularNums,
+                          ),
                         ),
                       ),
+                      if (ipd.caseReferenceId.isNotEmpty) ...[
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            'Case #${ipd.caseReferenceId}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withAlpha(16),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: primaryColor.withAlpha(36)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.hotel_rounded,
+                          size: 13,
+                          color: primaryColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            ipd.wardAndBedLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -463,6 +481,8 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                     children: [
                       Text(
                         ipd.patient.patientName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 16,
@@ -479,6 +499,8 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                           if (ipd.patient.mobileNo.isNotEmpty)
                             ipd.patient.mobileNo,
                         ].join('  •  '),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,
@@ -539,7 +561,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -558,14 +580,16 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       icon: const Icon(Icons.assignment_ind_rounded, size: 15),
                       label: const Text(
                         'Open Chart',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 11.5,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     flex: 4,
                     child: _IpdQuickPillBtn(
@@ -579,7 +603,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     flex: 3,
                     child: _IpdQuickPillBtn(
@@ -601,7 +625,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: primaryColor,
                         minimumSize: const Size(0, 40),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -620,14 +644,16 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       icon: const Icon(Icons.assignment_ind_rounded, size: 15),
                       label: const Text(
                         'Open Chart',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     flex: 3,
                     child: _IpdQuickPillBtn(
@@ -648,7 +674,7 @@ class _IpdAdmissionDetailCard extends StatelessWidget {
                       },
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 6),
                   Expanded(
                     flex: 3,
                     child: _IpdQuickPillBtn(
@@ -740,19 +766,24 @@ class _IpdQuickPillBtn extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: onTap,
-        child: SizedBox(
+        child: Container(
           height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon, size: 15, color: fg),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  color: fg,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w800,
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
               ),
             ],

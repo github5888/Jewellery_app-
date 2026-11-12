@@ -427,37 +427,49 @@ class _OpdVisitCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(18),
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    visit.opdNo,
-                    style: TextStyle(
-                      color: primaryColor,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      fontFeatures: AppTheme.tabularNums,
-                    ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 9,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: primaryColor.withAlpha(18),
+                          borderRadius: BorderRadius.circular(9),
+                        ),
+                        child: Text(
+                          visit.opdNo,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: primaryColor,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: AppTheme.tabularNums,
+                          ),
+                        ),
+                      ),
+                      if (visit.caseReferenceId.isNotEmpty) ...[
+                        const SizedBox(width: 7),
+                        Flexible(
+                          child: Text(
+                            'Case #${visit.caseReferenceId}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (visit.caseReferenceId.isNotEmpty) ...[
-                  const SizedBox(width: 7),
-                  Text(
-                    'Case #${visit.caseReferenceId}',
-                    style: const TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-                const Spacer(),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 9,

@@ -328,13 +328,16 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
                   ),
 
                   // 3. 2x2 Sculpted Module Grid
-                  GridView.count(
-                    crossAxisCount: 2,
+                  GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 1.55,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      mainAxisExtent: 112,
+                    ),
                     children: [
                       _HubModuleTile(
                         icon: Icons.water_drop_rounded,

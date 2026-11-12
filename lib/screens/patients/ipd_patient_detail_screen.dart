@@ -735,6 +735,105 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
             ],
           ),
         ),
+
+        if (ipd.isDischarged) ...[
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FDF4),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFBBF7D0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_rounded,
+                      size: 18,
+                      color: Color(0xFF16A34A),
+                    ),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Attending Doctor Discharge Summary',
+                        style: TextStyle(
+                          color: Color(0xFF14532D),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => showDischargeCardPreviewModal(
+                        context,
+                        admission: ipd,
+                      ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF035C7A),
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      icon: const Icon(Icons.print_outlined, size: 15),
+                      label: const Text(
+                        'Print Card',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _OverviewKeyValueRow(
+                  label: 'Discharge Date:',
+                  value: AppFormatters.formatSlashDateTimeWithSeconds(
+                    ipd.dischargeDate ?? ipd.admissionDate,
+                  ),
+                  valueColor: const Color(0xFF14532D),
+                  valueWeight: FontWeight.w800,
+                ),
+                const SizedBox(height: 6),
+                const Text(
+                  'Doctor Discharge Summary / Note:',
+                  style: TextStyle(
+                    color: Color(0xFF166534),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Text(
+                    ipd.clinicalSummary.isNotEmpty
+                        ? ipd.clinicalSummary
+                        : (ipd.nurseNotes.isNotEmpty
+                            ? ipd.nurseNotes.first.note
+                            : 'Patient discharged in stable clinical condition.'),
+                    style: const TextStyle(
+                      color: Color(0xFF0F172A),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -756,14 +855,16 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
       children: [
-        // 6 Website Latest Vital Cards (2x3 Grid on mobile)
-        GridView.count(
-          crossAxisCount: 3,
+        // 6 Website Latest Vital Cards (2x3 Grid on mobile — fixed mainAxisExtent prevents vertical overflow)
+        GridView(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: 1.08,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            mainAxisExtent: 104,
+          ),
           children: [
             _WebsiteVitalStatBox(
               label: 'Blood Pressure',
@@ -901,47 +1002,58 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.schedule_rounded,
-                              size: 14,
-                              color: Color(0xFF64748B),
-                            ),
-                            const SizedBox(width: 5),
-                            Text(
-                              AppFormatters.formatSlashDateTimeWithSeconds(
-                                v.date,
+                        Expanded(
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                size: 14,
+                                color: Color(0xFF64748B),
                               ),
-                              style: const TextStyle(
-                                color: AppColors.textPrimary,
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w800,
+                              const SizedBox(width: 5),
+                              Flexible(
+                                child: Text(
+                                  AppFormatters.formatSlashDateTimeWithSeconds(
+                                    v.date,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                        if (v.recordedBy.isNotEmpty)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'By ${v.recordedBy}',
-                              style: const TextStyle(
-                                color: Color(0xFF475569),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                        if (v.recordedBy.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'By ${v.recordedBy}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF475569),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
                           ),
+                        ],
                       ],
                     ),
                     const SizedBox(height: 10),
@@ -1527,18 +1639,22 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              round.doctorName.isEmpty
-                                  ? ipd.doctor.displayName
-                                  : round.doctorName,
-                              style: const TextStyle(
-                                color: Color(0xFF1D4ED8),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                            Expanded(
+                              child: Text(
+                                round.doctorName.isEmpty
+                                    ? ipd.doctor.displayName
+                                    : round.doctorName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF1D4ED8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               AppFormatters.formatDateTimeShort(round.date),
                               style: const TextStyle(
@@ -1664,16 +1780,20 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(
-                              n.nurseName,
-                              style: const TextStyle(
-                                color: Color(0xFF0F2942),
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
+                            Expanded(
+                              child: Text(
+                                n.nurseName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF0F2942),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 8),
                             Text(
                               AppFormatters.formatDateTimeShort(n.date),
                               style: const TextStyle(
@@ -1870,19 +1990,23 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                h.fromBed.isNotEmpty
-                                    ? '${h.fromBed} → ${h.toBed}'
-                                    : h.toBed,
-                                style: const TextStyle(
-                                  color: AppColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w800,
+                              Expanded(
+                                child: Text(
+                                  h.fromBed.isNotEmpty
+                                      ? '${h.fromBed} → ${h.toBed}'
+                                      : h.toBed,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
-                              if (h.date != null)
+                              if (h.date != null) ...[
+                                const SizedBox(width: 8),
                                 Text(
                                   AppFormatters.formatDateTimeShort(h.date),
                                   style: const TextStyle(
@@ -1890,6 +2014,7 @@ class _IpdPatientDetailScreenState extends State<IpdPatientDetailScreen> {
                                     fontSize: 11.5,
                                   ),
                                 ),
+                              ],
                             ],
                           ),
                           if (h.reason.isNotEmpty) ...[

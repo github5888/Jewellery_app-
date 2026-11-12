@@ -1124,7 +1124,7 @@ class _NurseProfileScreenState extends State<NurseProfileScreen> {
               crossAxisCount: 2,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 1.28,
+              mainAxisExtent: 126,
             ),
             itemBuilder: (context, index) {
               final item = NursePersonalTheme.presets[index];

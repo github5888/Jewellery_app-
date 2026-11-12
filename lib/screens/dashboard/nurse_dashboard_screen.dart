@@ -503,13 +503,15 @@ class NurseDashboardScreen extends StatelessWidget {
                 accentColor: primary,
               ),
               const SizedBox(height: 12),
-              GridView.count(
-                crossAxisCount: 2,
+              GridView(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 12,
-                crossAxisSpacing: 12,
-                childAspectRatio: 1.42,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  mainAxisExtent: 122,
+                ),
                 children: [
                   _BentoModuleCard(
                     icon: Icons.medical_services_rounded,
@@ -1463,34 +1465,41 @@ class _PremiumBedsidePatientCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5.5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: primaryColor.withAlpha(18),
-                    borderRadius: BorderRadius.circular(11),
-                    border: Border.all(color: primaryColor.withAlpha(38)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.hotel_rounded,
-                        size: 13.5,
-                        color: primaryColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        ipd.wardAndBedLabel,
-                        style: TextStyle(
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 136),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5.5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: primaryColor.withAlpha(18),
+                      borderRadius: BorderRadius.circular(11),
+                      border: Border.all(color: primaryColor.withAlpha(38)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.hotel_rounded,
+                          size: 13.5,
                           color: primaryColor,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            ipd.wardAndBedLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: primaryColor,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
