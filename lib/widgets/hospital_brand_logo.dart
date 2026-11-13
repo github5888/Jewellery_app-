@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
-/// Renders the signature `+B` Smart Super Speciality Hospital brand mark
-/// seen on the Splash & Nurse Portal Login screens.
+/// Renders the signature Smart Hospital full-blue squircle badge with a
+/// centered bold white `+` medical cross (`image-42.png`).
 class HospitalBrandLogo extends StatelessWidget {
   final double size;
 
@@ -11,50 +11,59 @@ class HospitalBrandLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size * 1.18,
+    final radius = size * 0.24;
+    final crossSpan = size * 0.54;
+    final crossThick = size * 0.184;
+    final barRadius = Radius.circular(crossThick * 0.10);
+
+    return Container(
+      width: size,
       height: size,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Positioned(
-            right: size * 0.04,
-            child: Text(
-              'B',
-              style: TextStyle(
-                fontSize: size * 0.92,
-                height: 1.0,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primaryDark,
-                letterSpacing: -2,
-              ),
-            ),
-          ),
-          Positioned(
-            left: size * 0.02,
-            child: Container(
-              width: size * 0.44,
-              height: size * 0.44,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                boxShadow: const [
-                  BoxShadow(
-                    color: AppColors.cardShadow,
-                    blurRadius: 8,
-                    offset: Offset(0, 2),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.add_rounded,
-                size: size * 0.40,
-                color: AppColors.accentSky,
-              ),
-            ),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radius),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF298BFF),
+            Color(0xFF136EF2),
+            Color(0xFF004CE6),
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x33004CE6),
+            blurRadius: 14,
+            offset: Offset(0, 5),
           ),
         ],
+      ),
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: crossSpan,
+        height: crossSpan,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: crossThick,
+              height: crossSpan,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(barRadius),
+              ),
+            ),
+            Container(
+              width: crossSpan,
+              height: crossThick,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.all(barRadius),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

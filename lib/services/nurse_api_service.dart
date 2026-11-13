@@ -577,65 +577,174 @@ class NurseApiService {
   }
 
   Future<List<AbhaScanCheckinItem>> fetchAbhaQueue() async {
-    List<AbhaScanCheckinItem>? emptySuccess;
-    for (final url in [
+    final dedicatedUrls = <String>[
+      endpoints.abdmScanShare,
+      '${endpoints.abdmScanShare}?status=all',
+      endpoints.abdmScanShareCheckins,
+      endpoints.abdmScanShareRequests,
+      endpoints.abdmScanShareCompact,
+      endpoints.abdmScanAndShare,
+      endpoints.abdmCheckins,
+      '${endpoints.abdmCheckins}?status=all',
+      endpoints.abdmCheckInsHyphen,
+      endpoints.abdmRequests,
+      endpoints.abdmTokens,
+      endpoints.abdmQueue,
+      endpoints.abdm,
       endpoints.abhaScanShare,
+      '${endpoints.abhaScanShare}?status=all',
+      endpoints.abhaScanShareCheckins,
+      endpoints.abhaScanShareRequests,
+      endpoints.abhaScanShareCompact,
+      endpoints.abhaScanAndShare,
       endpoints.abhaCheckins,
+      '${endpoints.abhaCheckins}?status=all',
+      endpoints.abhaCheckInsHyphen,
+      endpoints.abhaRequests,
+      endpoints.abhaTokens,
       endpoints.abhaQueue,
-      endpoints.abha,
-    ]) {
+      endpoints.opdScanShare,
+      endpoints.opdAbdmCheckins,
+      endpoints.opdAbhaCheckins,
+      endpoints.opdCheckins,
+      endpoints.scanShare,
+      endpoints.scanShareCompact,
+      endpoints.scanShareCheckins,
+    ];
+
+    final seenKeys = <String>{};
+    final merged = <AbhaScanCheckinItem>[];
+    final matchedSources = <String>[];
+
+    final responses = await Future.wait<MapEntry<String, dynamic>?>(
+      dedicatedUrls.map((url) async {
+        try {
+          final res = await _client.get(url);
+          return MapEntry<String, dynamic>(url, res);
+        } catch (_) {
+          return null;
+        }
+      }),
+    );
+
+    for (final entry in responses) {
+      if (entry == null) continue;
+      final rawMaps = JsonParsers.extractList(entry.value)
+          .where(AbhaScanCheckinItem.looksLikeCheckinMap)
+          .toList();
+      if (rawMaps.isEmpty) continue;
+
+      matchedSources.add('${entry.key}(${rawMaps.length})');
+      for (final raw in rawMaps) {
+        final item = AbhaScanCheckinItem.fromJson(raw);
+        if (item.isDismissed) continue;
+        final dedupKey = [
+          if (item.id.trim().isNotEmpty) 'id:${item.id.trim().toLowerCase()}',
+          if (item.tokenNumber.trim().isNotEmpty)
+            'tok:${item.tokenNumber.trim().toLowerCase()}',
+          if (item.id.trim().isEmpty && item.tokenNumber.trim().isEmpty)
+            'pat:${item.patientName.trim().toLowerCase()}|${item.abhaAddress.trim().toLowerCase()}|${item.abhaNumber.trim().toLowerCase()}|${item.displayTime}',
+        ].first;
+        if (seenKeys.add(dedupKey)) {
+          merged.add(item);
+        }
+      }
+    }
+
+    // Fallback check on `/api/abha` ONLY if items explicitly carry scan-share/token fields
+    if (merged.isEmpty) {
       try {
-        final res = await _client.get(url);
-        final list = JsonParsers.extractList(
-          res,
-          candidateKeys: const [
-            'checkins',
-            'check_ins',
-            'requests',
-            'tokens',
-            'queue',
-            'items',
-            'data',
-          ],
-        ).map(AbhaScanCheckinItem.fromJson).toList();
-        if (list.isNotEmpty) return list;
-        emptySuccess ??= list;
+        final res = await _client.get(endpoints.abha);
+        final rawMaps = JsonParsers.extractList(res).where((m) {
+          final hasScanFields = m.containsKey('check_in_code') ||
+              m.containsKey('checkInCode') ||
+              m.containsKey('token_number') ||
+              m.containsKey('tokenNumber') ||
+              m.containsKey('token_no') ||
+              m.containsKey('token') ||
+              m.containsKey('counter_id') ||
+              m.containsKey('counterId') ||
+              m.containsKey('scanned_at') ||
+              m.containsKey('scannedAt') ||
+              m.containsKey('profile');
+          return hasScanFields && AbhaScanCheckinItem.looksLikeCheckinMap(m);
+        }).toList();
+        for (final raw in rawMaps) {
+          final item = AbhaScanCheckinItem.fromJson(raw);
+          if (!item.isDismissed) merged.add(item);
+        }
+        if (merged.isNotEmpty) {
+          matchedSources.add('${endpoints.abha}(${merged.length})');
+        }
       } catch (_) {}
     }
-    return emptySuccess ?? const [];
+
+    merged.sort((a, b) {
+      if (a.isPending != b.isPending) return a.isPending ? -1 : 1;
+      if (a.createdAt != null && b.createdAt != null) {
+        return b.createdAt!.compareTo(a.createdAt!);
+      }
+      return 0;
+    });
+
+    debugPrint(
+      '[AbdmScanShareSync] loaded ${merged.length} check-in(s) from ${matchedSources.isEmpty ? "none" : matchedSources.join(", ")}',
+    );
+    return merged;
   }
 
   /// Fetches Hospital Counter QR configuration (`Hospital QR Code` tab — image-37).
   Future<AbhaHospitalQrInfo> fetchAbhaHospitalQrConfig({
     String fallbackHospitalName = 'Smart Super Speciality Hospital',
   }) async {
-    for (final url in [
+    final qrUrls = <String>[
+      endpoints.abdmScanShareQr,
+      endpoints.abdmQr,
+      endpoints.abdmConfig,
+      endpoints.abdmScanShare,
       endpoints.abhaScanShareQr,
       endpoints.abhaQr,
       endpoints.abhaConfig,
       endpoints.abhaScanShare,
-    ]) {
-      try {
-        final res = await _client.get(url);
-        if (res is Map) {
-          final map = JsonParsers.asMap(res);
-          final inner = map['qr'] is Map
-              ? JsonParsers.asMap(map['qr'])
-              : (map['config'] is Map ? JsonParsers.asMap(map['config']) : map);
-          if (inner.containsKey('counter_id') ||
-              inner.containsKey('counterId') ||
-              inner.containsKey('facility_id') ||
-              inner.containsKey('facilityId') ||
-              inner.containsKey('hip_id') ||
-              inner.containsKey('qr_payload') ||
-              inner.containsKey('qr_image')) {
-            return AbhaHospitalQrInfo.fromJson(
-              inner,
-              fallbackHospitalName: fallbackHospitalName,
-            );
-          }
+      endpoints.scanShareQr,
+    ];
+
+    final results = await Future.wait<dynamic>(
+      qrUrls.map((url) async {
+        try {
+          return await _client.get(url);
+        } catch (_) {
+          return null;
         }
-      } catch (_) {}
+      }),
+    );
+
+    for (final res in results) {
+      if (res is Map) {
+        final map = JsonParsers.asMap(res);
+        final dataMap =
+            map['data'] is Map ? JsonParsers.asMap(map['data']) : map;
+        final inner = dataMap['qr'] is Map
+            ? JsonParsers.asMap(dataMap['qr'])
+            : (dataMap['config'] is Map
+                ? JsonParsers.asMap(dataMap['config'])
+                : (map['qr'] is Map ? JsonParsers.asMap(map['qr']) : dataMap));
+        if (inner.containsKey('counter_id') ||
+            inner.containsKey('counterId') ||
+            inner.containsKey('facility_id') ||
+            inner.containsKey('facilityId') ||
+            inner.containsKey('hip_id') ||
+            inner.containsKey('hipId') ||
+            inner.containsKey('qr_payload') ||
+            inner.containsKey('qrPayload') ||
+            inner.containsKey('qr_image') ||
+            inner.containsKey('qrImage')) {
+          return AbhaHospitalQrInfo.fromJson(
+            inner,
+            fallbackHospitalName: fallbackHospitalName,
+          );
+        }
+      }
     }
     return AbhaHospitalQrInfo.fromJson(
       const <String, dynamic>{},
@@ -649,6 +758,8 @@ class NurseApiService {
       'address': 'harpreet.singh28@abdm',
       'abha': '91-7845-2391-6642',
       'gender': 'Male',
+      'dob': '14/05/1991',
+      'age': '35',
       'mobile': '9833445566',
     },
     {
@@ -656,6 +767,8 @@ class NurseApiService {
       'address': 'ananya.mukherjee70@abdm',
       'abha': '91-6120-8843-1905',
       'gender': 'Female',
+      'dob': '22/08/1996',
+      'age': '30',
       'mobile': '9822334455',
     },
     {
@@ -663,6 +776,8 @@ class NurseApiService {
       'address': 'rohan.kulkarni14@abdm',
       'abha': '91-5390-4412-8871',
       'gender': 'Male',
+      'dob': '09/11/1988',
+      'age': '37',
       'mobile': '9811223344',
     },
     {
@@ -670,19 +785,21 @@ class NurseApiService {
       'address': 'meera.nair09@abdm',
       'abha': '91-8421-9034-5518',
       'gender': 'Female',
+      'dob': '03/02/1999',
+      'age': '27',
       'mobile': '9845012345',
     },
   ];
 
-  /// Triggers `⚡ Simulate Patient Scan` on ABDM Scan & Share (`POST /api/abha/scan-share/simulate` — image-36).
+  /// Triggers `⚡ Simulate Patient Scan` on ABDM Scan & Share (`POST /api/abdm/scan-share/simulate` — image-36).
   Future<AbhaScanCheckinItem> simulateAbhaPatientScan({int seedIndex = 0}) async {
     final now = DateTime.now();
     final sample = _sampleAbdmProfiles[seedIndex % _sampleAbdmProfiles.length];
     final hex = now.microsecondsSinceEpoch
         .toRadixString(16)
         .toUpperCase()
-        .padLeft(12, '0');
-    final code = 'CHK-${hex.substring(hex.length - 12)}';
+        .padLeft(8, '0');
+    final code = 'CHK-${hex.substring(hex.length - 6)}';
     final hh = now.hour.toString().padLeft(2, '0');
     final mm = now.minute.toString().padLeft(2, '0');
 
@@ -690,10 +807,14 @@ class NurseApiService {
       'check_in_code': code,
       'check_in_id': code,
       'token_no': code,
+      'token_number': code,
       'patient_name': sample['name'],
+      'name': sample['name'],
       'abha_address': sample['address'],
       'abha_number': sample['abha'],
       'gender': sample['gender'],
+      'dob': sample['dob'],
+      'age': sample['age'],
       'mobile': sample['mobile'],
       'counter_id': 'OPD-COUNTER-1',
       'facility_id': 'IN0810000123',
@@ -703,31 +824,91 @@ class NurseApiService {
     };
 
     for (final url in [
+      endpoints.abdmScanShareSimulate,
+      endpoints.abdmSimulate,
+      endpoints.abdmScanShare,
+      endpoints.abdmCheckins,
       endpoints.abhaScanShareSimulate,
       endpoints.abhaSimulate,
       endpoints.abhaScanShare,
       endpoints.abhaCheckins,
       endpoints.abhaQueue,
+      endpoints.scanShareSimulate,
+      endpoints.scanShare,
     ]) {
       try {
         final res = await _client.post(url, body: body);
         final obj = JsonParsers.extractObject(res);
-        if (obj.isNotEmpty) {
+        if (obj.isNotEmpty && AbhaScanCheckinItem.looksLikeCheckinMap(obj)) {
           return AbhaScanCheckinItem.fromJson(obj);
         }
         return AbhaScanCheckinItem.fromJson(body);
       } on ApiException catch (e) {
         if (!e.isNotFound) rethrow;
-      }
+      } catch (_) {}
     }
 
     return AbhaScanCheckinItem.fromJson(body);
+  }
+
+  /// Marks an ABDM Scan & Share check-in as COMPLETED / processed.
+  Future<void> completeAbhaScanCheckin(String checkinId) async {
+    if (checkinId.trim().isEmpty) return;
+    for (final action in <Future<dynamic> Function()>[
+      () => _client.post(
+            endpoints.abdmScanShareComplete(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.put(
+            endpoints.abdmScanShareItem(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.put(
+            endpoints.abdmCheckinItem(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.post(
+            endpoints.abhaScanShareComplete(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.put(
+            endpoints.abhaScanShareItem(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.put(
+            endpoints.abhaCheckinItem(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+      () => _client.put(
+            endpoints.scanShareItem(checkinId),
+            body: const {'status': 'COMPLETED'},
+          ),
+    ]) {
+      try {
+        await action();
+        return;
+      } catch (_) {}
+    }
   }
 
   /// Dismisses / removes an ABDM Scan & Share check-in (`×` button in image-36).
   Future<void> dismissAbhaScanCheckin(String checkinId) async {
     if (checkinId.trim().isEmpty) return;
     for (final action in <Future<dynamic> Function()>[
+      () => _client.delete(endpoints.abdmScanShareItem(checkinId)),
+      () => _client.post(
+            endpoints.abdmScanShareDismiss(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
+      () => _client.put(
+            endpoints.abdmScanShareItem(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
+      () => _client.delete(endpoints.abdmCheckinItem(checkinId)),
+      () => _client.post(
+            endpoints.abdmCheckinDismiss(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
       () => _client.delete(endpoints.abhaScanShareItem(checkinId)),
       () => _client.post(
             endpoints.abhaScanShareDismiss(checkinId),
@@ -735,6 +916,12 @@ class NurseApiService {
           ),
       () => _client.put(
             endpoints.abhaScanShareItem(checkinId),
+            body: const {'status': 'DISMISSED'},
+          ),
+      () => _client.delete(endpoints.abhaCheckinItem(checkinId)),
+      () => _client.delete(endpoints.scanShareItem(checkinId)),
+      () => _client.post(
+            endpoints.scanShareDismiss(checkinId),
             body: const {'status': 'DISMISSED'},
           ),
     ]) {
@@ -1749,10 +1936,7 @@ class NurseApiService {
     for (final url in urls) {
       try {
         final raw = await _client.get(url);
-        final list = JsonParsers.extractList(
-          raw,
-          candidateKeys: const ['bills', 'orders', 'records', 'items', 'data'],
-        );
+        final list = JsonParsers.extractList(raw);
         if (list.isEmpty) continue;
         final matched = list.where((m) => _matchesAdmissionOrder(m, admission)).toList();
         return InvestigationOrder.parseBillOrOrderList(
@@ -1945,10 +2129,7 @@ class NurseApiService {
     for (final url in [endpoints.bedGroups, endpoints.bedGroupsAlt]) {
       try {
         final res = await _client.get(url);
-        return JsonParsers.extractList(
-          res,
-          candidateKeys: const ['groups', 'bedGroups', 'wards', 'records', 'items', 'data'],
-        ).map(WardBedGroup.fromJson).toList();
+        return JsonParsers.extractList(res).map(WardBedGroup.fromJson).toList();
       } on ApiException catch (e) {
         lastErr = e;
         if (!e.isNotFound) rethrow;
@@ -2066,10 +2247,7 @@ class NurseApiService {
     ]) {
       try {
         final res = await _client.get(url);
-        final list = JsonParsers.extractList(
-          res,
-          candidateKeys: const ['donors', 'records', 'items', 'data'],
-        );
+        final list = JsonParsers.extractList(res);
         final filtered = list
             .where(
               (m) =>
@@ -2106,16 +2284,9 @@ class NurseApiService {
     for (final url in candidateUrls) {
       try {
         final res = await _client.get(url);
-        final parsed = JsonParsers.extractList(
-          res,
-          candidateKeys: const [
-            'assignments',
-            'rosters',
-            'records',
-            'items',
-            'data',
-          ],
-        ).map(DutyShiftAssignment.fromJson).toList();
+        final parsed = JsonParsers.extractList(res)
+            .map(DutyShiftAssignment.fromJson)
+            .toList();
 
         if (parsed.isNotEmpty) return parsed;
         firstValidEmpty ??= parsed;
@@ -2135,10 +2306,9 @@ class NurseApiService {
   Future<List<StaffRosterMember>> fetchStaffDirectory() async {
     try {
       final res = await _client.get(endpoints.staffList);
-      final parsed = JsonParsers.extractList(
-        res,
-        candidateKeys: const ['staff', 'users', 'members', 'records', 'items', 'data'],
-      ).map(StaffRosterMember.fromJson).toList();
+      final parsed = JsonParsers.extractList(res)
+          .map(StaffRosterMember.fromJson)
+          .toList();
       parsed.sort((a, b) {
         final ai = int.tryParse(a.employeeId);
         final bi = int.tryParse(b.employeeId);
@@ -2168,10 +2338,9 @@ class NurseApiService {
     ]) {
       try {
         final res = await _client.get(url);
-        final parsed = JsonParsers.extractList(
-          res,
-          candidateKeys: const ['holidays', 'events', 'records', 'items', 'data'],
-        ).map(HospitalHolidayItem.fromJson).toList();
+        final parsed = JsonParsers.extractList(res)
+            .map(HospitalHolidayItem.fromJson)
+            .toList();
         if (parsed.isNotEmpty) return parsed;
         emptyOk ??= parsed;
       } on ApiException catch (e) {

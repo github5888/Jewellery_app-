@@ -1,10 +1,10 @@
 {
-    "name": "Smart Super Speciality Hospital - Nurse Portal",
-    "short_name": "Nurse Portal",
+    "name": "Smart Hospital",
+    "short_name": "Smart Hospital",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#EEF4FB",
-    "theme_color": "#0B53A6",
+    "theme_color": "#136EF2",
     "description": "Smart Super Speciality Hospital Nurse Care System & Bedside Clinical Ward App",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,

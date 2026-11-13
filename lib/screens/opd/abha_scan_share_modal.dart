@@ -57,9 +57,15 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
           fallbackHospitalName: ctrl.hospitalInfo.name,
         ),
       ]);
+      final loadedQueue = results[0] as List<AbhaScanCheckinItem>;
       if (!mounted) return;
       setState(() {
         _qrInfo = results[1] as AbhaHospitalQrInfo;
+        if (_statusFilter == 'Pending Only' &&
+            loadedQueue.isNotEmpty &&
+            loadedQueue.where((x) => x.isPending).isEmpty) {
+          _statusFilter = 'All Requests';
+        }
         _loadingQueue = false;
       });
     } catch (_) {
@@ -99,6 +105,18 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
     }
   }
 
+  Future<void> _handleComplete(AbhaScanCheckinItem item) async {
+    final ctrl = NursePortalScope.read(context);
+    await ctrl.completeAbhaCheckinItem(item);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Check-in marked completed for ${item.patientName}'),
+        backgroundColor: AppColors.success,
+      ),
+    );
+  }
+
   Future<void> _handleDismiss(AbhaScanCheckinItem item) async {
     final ctrl = NursePortalScope.read(context);
     await ctrl.dismissAbhaCheckinItem(item);
@@ -109,14 +127,9 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
     final ctrl = NursePortalScope.of(context);
     final allItems = ctrl.abhaQueue;
     final filtered = allItems.where((item) {
-      final st = item.status.trim().toLowerCase();
       if (_statusFilter == 'Pending Only') return item.isPending;
-      if (_statusFilter == 'Completed') {
-        return st == 'completed' || st == 'done' || st == 'registered';
-      }
-      if (_statusFilter == 'Dismissed') {
-        return st == 'dismissed' || st == 'cancelled';
-      }
+      if (_statusFilter == 'Completed') return item.isCompleted;
+      if (_statusFilter == 'Dismissed') return item.isDismissed;
       return true;
     }).toList();
 
@@ -412,25 +425,41 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
                 border: Border.all(color: AppColors.border),
               ),
               child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 11,
+                      horizontal: 10,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE0F2FE),
                       borderRadius: BorderRadius.circular(9),
                     ),
-                    child: Text(
-                      item.displayCode,
-                      style: const TextStyle(
-                        color: Color(0xFF035C7A),
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w900,
-                        fontFeatures: AppTheme.tabularNums,
-                      ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          item.displayCode,
+                          style: const TextStyle(
+                            color: Color(0xFF035C7A),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w900,
+                            fontFeatures: AppTheme.tabularNums,
+                          ),
+                        ),
+                        if (item.counterId.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            item.counterId,
+                            style: const TextStyle(
+                              color: Color(0xFF0284C7),
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -473,9 +502,29 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
                                 ),
                               ),
                             ),
+                            if (item.uhid.trim().isNotEmpty)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.uhid,
+                                  style: const TextStyle(
+                                    color: Color(0xFF1D4ED8),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                    fontFeatures: AppTheme.tabularNums,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
                         Wrap(
                           spacing: 6,
                           runSpacing: 3,
@@ -489,13 +538,15 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
-                              )
-                            else if (item.abhaNumber.isNotEmpty)
+                              ),
+                            if (item.abhaNumber.isNotEmpty)
                               Text(
-                                item.abhaNumber,
+                                item.abhaAddress.isNotEmpty
+                                    ? '(${item.abhaNumber})'
+                                    : item.abhaNumber,
                                 style: const TextStyle(
-                                  color: Color(0xFF026789),
-                                  fontSize: 12,
+                                  color: Color(0xFF0369A1),
+                                  fontSize: 11.5,
                                   fontWeight: FontWeight.w700,
                                   fontFeatures: AppTheme.tabularNums,
                                 ),
@@ -507,6 +558,16 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
                                   color: AppColors.textSecondary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            if (item.displayAgeOrDob.isNotEmpty)
+                              Text(
+                                '•  ${item.displayAgeOrDob}',
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: AppTheme.tabularNums,
                                 ),
                               ),
                             if (item.mobile.isNotEmpty)
@@ -531,18 +592,53 @@ class _AbhaScanShareDialogState extends State<_AbhaScanShareDialog> {
                               ),
                           ],
                         ),
+                        if (item.address.trim().isNotEmpty ||
+                            item.department.trim().isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            [
+                              if (item.department.trim().isNotEmpty)
+                                'Dept: ${item.department.trim()}',
+                              if (item.address.trim().isNotEmpty)
+                                item.address.trim(),
+                            ].join('  •  '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
-                  IconButton(
-                    tooltip: 'Dismiss Request',
-                    onPressed: () => _handleDismiss(item),
-                    icon: const Icon(
-                      Icons.close_rounded,
-                      size: 18,
-                      color: AppColors.textMuted,
-                    ),
-                    visualDensity: VisualDensity.compact,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (item.isPending)
+                        IconButton(
+                          tooltip: 'Complete Check-in',
+                          onPressed: () => _handleComplete(item),
+                          icon: const Icon(
+                            Icons.check_circle_outline_rounded,
+                            size: 19,
+                            color: Color(0xFF059669),
+                          ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      IconButton(
+                        tooltip: 'Dismiss Request',
+                        onPressed: () => _handleDismiss(item),
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          size: 18,
+                          color: AppColors.textMuted,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ],
                   ),
                 ],
               ),

@@ -270,10 +270,24 @@ class JsonParsers {
       'messages',
       'checkins',
       'check_ins',
+      'checkInRequests',
+      'check_in_requests',
+      'abdmCheckins',
+      'abdm_checkins',
+      'abhaCheckins',
+      'abha_checkins',
+      'scanShareRequests',
+      'scan_share_requests',
+      'scanShare',
+      'scan_share',
+      'pendingRequests',
+      'pending_requests',
+      'sharedProfiles',
+      'shared_profiles',
+      'profiles',
       'requests',
       'tokens',
       'queue',
-      'scanShare',
       'ambulances',
       'calls',
       'ambulanceCalls',
@@ -288,24 +302,51 @@ class JsonParsers {
     if (body is List) return asMapList(body);
     if (body is Map) {
       final map = asMap(body);
+      List<Map<String, dynamic>>? emptyFallback;
+
+      // 1. Prefer non-empty candidate list on top-level map
       for (final key in candidateKeys) {
         final v = map[key];
-        if (v is List) return asMapList(v);
-      }
-      final nestedData = map['data'];
-      if (nestedData is Map) {
-        final nestedMap = asMap(nestedData);
-        for (final key in candidateKeys) {
-          final v = nestedMap[key];
-          if (v is List) return asMapList(v);
-        }
-        for (final val in nestedMap.values) {
-          if (val is List) return asMapList(val);
+        if (v is List) {
+          final parsed = asMapList(v);
+          if (parsed.isNotEmpty) return parsed;
+          emptyFallback ??= parsed;
         }
       }
+
+      // 2. Prefer non-empty list inside nested `data` / `result` / `payload` map
+      for (final wrapperKey in const ['data', 'result', 'payload', 'response']) {
+        final nestedData = map[wrapperKey];
+        if (nestedData is Map) {
+          final nestedMap = asMap(nestedData);
+          for (final key in candidateKeys) {
+            final v = nestedMap[key];
+            if (v is List) {
+              final parsed = asMapList(v);
+              if (parsed.isNotEmpty) return parsed;
+              emptyFallback ??= parsed;
+            }
+          }
+          for (final val in nestedMap.values) {
+            if (val is List) {
+              final parsed = asMapList(val);
+              if (parsed.isNotEmpty) return parsed;
+              emptyFallback ??= parsed;
+            }
+          }
+        }
+      }
+
+      // 3. Prefer any non-empty list anywhere on top-level map
       for (final val in map.values) {
-        if (val is List) return asMapList(val);
+        if (val is List) {
+          final parsed = asMapList(val);
+          if (parsed.isNotEmpty) return parsed;
+          emptyFallback ??= parsed;
+        }
       }
+
+      if (emptyFallback != null) return emptyFallback;
     }
     return const [];
   }

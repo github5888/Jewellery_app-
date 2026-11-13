@@ -480,7 +480,14 @@ class AbhaScanCheckinItem {
   final String abhaNumber;
   final String abhaAddress;
   final String gender;
+  final String dob;
+  final String age;
   final String mobile;
+  final String address;
+  final String uhid;
+  final String patientId;
+  final String counterId;
+  final String department;
   final String status;
   final String timeString;
   final DateTime? createdAt;
@@ -492,25 +499,76 @@ class AbhaScanCheckinItem {
     required this.abhaNumber,
     required this.abhaAddress,
     required this.gender,
+    this.dob = '',
+    this.age = '',
     required this.mobile,
+    this.address = '',
+    this.uhid = '',
+    this.patientId = '',
+    this.counterId = '',
+    this.department = '',
     required this.status,
     this.timeString = '',
     this.createdAt,
   });
 
-  bool get isPending {
-    final s = status.trim().toLowerCase();
-    return s.isEmpty ||
-        s == 'pending' ||
-        s == 'waiting' ||
-        s == 'queued' ||
-        s == 'scanned';
+  AbhaScanCheckinItem copyWith({
+    String? status,
+    String? tokenNumber,
+    String? uhid,
+  }) {
+    return AbhaScanCheckinItem(
+      id: id,
+      tokenNumber: tokenNumber ?? this.tokenNumber,
+      patientName: patientName,
+      abhaNumber: abhaNumber,
+      abhaAddress: abhaAddress,
+      gender: gender,
+      dob: dob,
+      age: age,
+      mobile: mobile,
+      address: address,
+      uhid: uhid ?? this.uhid,
+      patientId: patientId,
+      counterId: counterId,
+      department: department,
+      status: status ?? this.status,
+      timeString: timeString,
+      createdAt: createdAt,
+    );
   }
+
+  bool get isCompleted {
+    final s = status.trim().toLowerCase();
+    return s.contains('complet') ||
+        s.contains('done') ||
+        s.contains('register') ||
+        s.contains('issued') ||
+        s.contains('convert') ||
+        s.contains('closed') ||
+        s.contains('attend');
+  }
+
+  bool get isDismissed {
+    final s = status.trim().toLowerCase();
+    return s.contains('dismiss') ||
+        s.contains('cancel') ||
+        s.contains('reject') ||
+        s.contains('expir') ||
+        s.contains('ignore');
+  }
+
+  /// Active ABDM Scan & Share check-ins include `PENDING`, `VERIFIED`,
+  /// `IDENTITY_VERIFIED`, `SHARED`, `PROFILE_SHARED`, `RECEIVED`, `WAITING`,
+  /// `SCANNED`, `NEW`, `OPEN`, `ACTIVE`, `QUEUED`, `READY`, or blank status.
+  bool get isPending => !isCompleted && !isDismissed;
 
   String get displayCode {
     final t = tokenNumber.trim();
     if (t.isEmpty) {
-      final tail = id.length > 8 ? id.substring(id.length - 8).toUpperCase() : id.toUpperCase();
+      final tail = id.length > 6
+          ? id.substring(id.length - 6).toUpperCase()
+          : id.toUpperCase();
       return tail.isEmpty ? 'CHK-ABDM' : 'CHK-$tail';
     }
     return t;
@@ -518,71 +576,342 @@ class AbhaScanCheckinItem {
 
   String get displayTime {
     if (timeString.trim().isNotEmpty) return timeString.trim();
-    if (createdAt != null) return AppFormatters.formatTime24h(createdAt);
+    if (createdAt != null) return AppFormatters.formatTime12h(createdAt);
     return '';
   }
 
+  String get displayAgeOrDob {
+    final parts = <String>[];
+    if (dob.trim().isNotEmpty) parts.add(dob.trim());
+    if (age.trim().isNotEmpty) {
+      final a = age.trim();
+      parts.add(RegExp(r'^\d+$').hasMatch(a) ? '$a Yrs' : a);
+    }
+    return parts.join(' • ');
+  }
+
+  /// Returns true when a raw JSON map looks like a valid patient / ABDM check-in record
+  /// rather than an unrelated wrapper/config object.
+  static bool looksLikeCheckinMap(Map<String, dynamic> json) {
+    if (json.isEmpty) return false;
+    final flat = _flattenCheckinSources(json);
+    final hasIdentity = JsonParsers.asString(
+      flat['patient_name'] ??
+          flat['patientName'] ??
+          flat['full_name'] ??
+          flat['fullName'] ??
+          flat['name'] ??
+          flat['first_name'] ??
+          flat['firstName'] ??
+          flat['abha_number'] ??
+          flat['abhaNumber'] ??
+          flat['abha_no'] ??
+          flat['health_id_number'] ??
+          flat['healthIdNumber'] ??
+          flat['abha_address'] ??
+          flat['abhaAddress'] ??
+          flat['phr_address'] ??
+          flat['phrAddress'] ??
+          flat['health_id'] ??
+          flat['healthId'] ??
+          flat['token'] ??
+          flat['token_number'] ??
+          flat['tokenNumber'] ??
+          flat['token_no'] ??
+          flat['check_in_code'] ??
+          flat['checkInCode'],
+    ).isNotEmpty;
+    return hasIdentity;
+  }
+
+  static Map<String, dynamic> _flattenCheckinSources(
+    Map<String, dynamic> json,
+  ) {
+    final merged = <String, dynamic>{};
+
+    void absorb(dynamic candidate) {
+      if (candidate is Map) {
+        final m = JsonParsers.asMap(candidate);
+        for (final entry in m.entries) {
+          if (entry.value != null && entry.value.toString().trim().isNotEmpty) {
+            merged.putIfAbsent(entry.key, () => entry.value);
+          }
+        }
+      }
+    }
+
+    // Top-level fields win first, followed by nested ABDM `profile` / `patient` maps
+    absorb(json);
+    for (final key in const [
+      'profile',
+      'patient',
+      'patient_profile',
+      'patientProfile',
+      'abdm_profile',
+      'abdmProfile',
+      'abha_profile',
+      'abhaProfile',
+      'demographics',
+      'user',
+      'data',
+    ]) {
+      final sub = json[key];
+      if (sub is Map) {
+        final subMap = JsonParsers.asMap(sub);
+        absorb(subMap);
+        for (final innerKey in const ['patient', 'profile', 'demographics', 'address']) {
+          absorb(subMap[innerKey]);
+        }
+      }
+    }
+    return merged;
+  }
+
   factory AbhaScanCheckinItem.fromJson(Map<String, dynamic> json) {
-    final rawDoc = AppFormatters.initials(
-      JsonParsers.asString(json['patient_name'] ?? json['name']),
+    final flat = _flattenCheckinSources(json);
+
+    // Build full name from flat or split first/middle/last fields
+    String resolvedName = JsonParsers.asString(
+      flat['patient_name'] ??
+          flat['patientName'] ??
+          flat['full_name'] ??
+          flat['fullName'] ??
+          flat['name'],
     );
-    final patMap = json['patient'] is Map
-        ? JsonParsers.asMap(json['patient'])
-        : <String, dynamic>{};
+    if (resolvedName.isEmpty) {
+      final first = JsonParsers.asString(
+        flat['first_name'] ?? flat['firstName'],
+      );
+      final middle = JsonParsers.asString(
+        flat['middle_name'] ?? flat['middleName'],
+      );
+      final last = JsonParsers.asString(
+        flat['last_name'] ?? flat['lastName'] ?? flat['surname'],
+      );
+      resolvedName = [first, middle, last]
+          .where((s) => s.trim().isNotEmpty)
+          .join(' ')
+          .trim();
+    }
+    if (resolvedName.isEmpty) {
+      resolvedName = 'ABDM Patient';
+    }
+
+    // Normalize Gender (`M` -> `Male`, `F` -> `Female`, `O` -> `Other`)
+    final rawGender = JsonParsers.asString(
+      flat['gender'] ?? flat['sex'],
+    ).trim();
+    String normalizedGender = rawGender;
+    final gUpper = rawGender.toUpperCase();
+    if (gUpper == 'M') {
+      normalizedGender = 'Male';
+    } else if (gUpper == 'F') {
+      normalizedGender = 'Female';
+    } else if (gUpper == 'O') {
+      normalizedGender = 'Other';
+    }
+
+    // Normalize DOB (`dayOfBirth`/`monthOfBirth`/`yearOfBirth` or ISO/slash string) with zero TZ shift
+    String rawDob = JsonParsers.asString(
+      flat['dob'] ??
+          flat['date_of_birth'] ??
+          flat['dateOfBirth'] ??
+          flat['birth_date'] ??
+          flat['birthDate'],
+    );
+    if (rawDob.isEmpty) {
+      final y = JsonParsers.asString(
+        flat['yearOfBirth'] ?? flat['year_of_birth'],
+      );
+      final m = JsonParsers.asString(
+        flat['monthOfBirth'] ?? flat['month_of_birth'],
+      );
+      final d = JsonParsers.asString(
+        flat['dayOfBirth'] ?? flat['day_of_birth'],
+      );
+      if (y.isNotEmpty && m.isNotEmpty && d.isNotEmpty) {
+        rawDob = '${d.padLeft(2, '0')}/${m.padLeft(2, '0')}/$y';
+      } else if (y.isNotEmpty) {
+        rawDob = y;
+      }
+    }
+    final formattedDob = rawDob.contains('-') || rawDob.contains('T')
+        ? JsonParsers.formatCalendarSlash(rawDob, fallback: rawDob)
+        : rawDob;
+
+    // Age (explicit or computed from DOB calendar year)
+    String resolvedAge = JsonParsers.asString(
+      flat['age'] ?? flat['years'] ?? flat['patient_age'],
+    );
+    if (resolvedAge.isEmpty && rawDob.isNotEmpty) {
+      final dt = JsonParsers.asCalendarDate(rawDob);
+      if (dt != null) {
+        final now = DateTime.now();
+        int yrs = now.year - dt.year;
+        if (now.month < dt.month ||
+            (now.month == dt.month && now.day < dt.day)) {
+          yrs--;
+        }
+        if (yrs >= 0 && yrs < 130) {
+          resolvedAge = '$yrs';
+        }
+      } else if (RegExp(r'^\d{4}$').hasMatch(rawDob.trim())) {
+        final yrs = DateTime.now().year - int.parse(rawDob.trim());
+        if (yrs >= 0 && yrs < 130) {
+          resolvedAge = '$yrs';
+        }
+      }
+    }
+
+    // Normalize Address (string or nested address map)
+    String resolvedAddress = '';
+    final addrRaw = flat['address'];
+    if (addrRaw is Map) {
+      final am = JsonParsers.asMap(addrRaw);
+      resolvedAddress = [
+        JsonParsers.asString(am['line'] ?? am['street'] ?? am['address']),
+        JsonParsers.asString(am['district'] ?? am['district_name'] ?? am['city']),
+        JsonParsers.asString(am['state'] ?? am['state_name']),
+        JsonParsers.asString(am['pincode'] ?? am['pin']),
+      ].where((s) => s.trim().isNotEmpty).join(', ');
+    } else {
+      resolvedAddress = [
+        JsonParsers.asString(addrRaw),
+        JsonParsers.asString(
+          flat['district_name'] ?? flat['districtName'] ?? flat['district'],
+        ),
+        JsonParsers.asString(
+          flat['state_name'] ?? flat['stateName'] ?? flat['state'],
+        ),
+        JsonParsers.asString(flat['pincode']),
+      ].where((s) => s.trim().isNotEmpty).toSet().join(', ');
+    }
+
+    final rawToken = JsonParsers.asString(
+      json['token_number'] ??
+          json['tokenNumber'] ??
+          json['token_no'] ??
+          json['tokenNo'] ??
+          json['token'] ??
+          json['check_in_code'] ??
+          json['checkInCode'] ??
+          json['checkin_code'] ??
+          json['code'] ??
+          json['queue_no'] ??
+          json['queueNo'] ??
+          json['request_no'] ??
+          flat['token_number'] ??
+          flat['tokenNumber'] ??
+          flat['token_no'] ??
+          flat['token'],
+    );
+
+    final fallbackSeed = AppFormatters.initials(resolvedName);
+
     return AbhaScanCheckinItem(
       id: JsonParsers.asId(
         json['_id'] ??
             json['id'] ??
             json['check_in_id'] ??
+            json['checkInId'] ??
             json['checkin_id'] ??
-            rawDoc,
-      ),
-      tokenNumber: JsonParsers.asString(
-        json['check_in_code'] ??
-            json['checkin_code'] ??
-            json['check_in_id'] ??
-            json['checkin_id'] ??
-            json['code'] ??
             json['request_id'] ??
-            json['token_no'] ??
-            json['tokenNo'] ??
-            json['token'] ??
-            json['queue_no'],
-      ),
-      patientName: JsonParsers.asString(
-        json['patient_name'] ??
-            json['patientName'] ??
-            json['name'] ??
-            patMap['patient_name'] ??
-            patMap['name'],
-        fallback: 'ABHA Check-in',
-      ),
+            json['requestId'] ??
+            rawToken,
+      ).isNotEmpty
+          ? JsonParsers.asId(
+              json['_id'] ??
+                  json['id'] ??
+                  json['check_in_id'] ??
+                  json['checkInId'] ??
+                  json['checkin_id'] ??
+                  json['request_id'] ??
+                  json['requestId'] ??
+                  rawToken,
+            )
+          : fallbackSeed,
+      tokenNumber: rawToken,
+      patientName: resolvedName,
       abhaNumber: JsonParsers.asString(
-        json['abha_number'] ??
-            json['abhaNumber'] ??
-            json['abha_no'] ??
-            patMap['abha_number'],
+        flat['abha_number'] ??
+            flat['abhaNumber'] ??
+            flat['abha_no'] ??
+            flat['abhaNo'] ??
+            flat['abha_id'] ??
+            flat['abhaId'] ??
+            flat['health_id_number'] ??
+            flat['healthIdNumber'] ??
+            flat['hidn'],
       ),
       abhaAddress: JsonParsers.asString(
-        json['abha_address'] ??
-            json['abhaAddress'] ??
-            json['health_id'] ??
-            patMap['abha_address'],
+        flat['abha_address'] ??
+            flat['abhaAddress'] ??
+            flat['phr_address'] ??
+            flat['phrAddress'] ??
+            flat['health_id'] ??
+            flat['healthId'],
       ),
-      gender: JsonParsers.asString(json['gender'] ?? patMap['gender']),
+      gender: normalizedGender,
+      dob: formattedDob,
+      age: resolvedAge,
       mobile: JsonParsers.asString(
-        json['mobile'] ??
-            json['mobileno'] ??
-            json['phone'] ??
-            patMap['mobileno'] ??
-            patMap['phone'],
+        flat['mobile'] ??
+            flat['mobileno'] ??
+            flat['mobile_no'] ??
+            flat['mobileNo'] ??
+            flat['phone'] ??
+            flat['phoneNumber'] ??
+            flat['phone_number'] ??
+            flat['contact_no'] ??
+            flat['contact'],
       ),
-      status: JsonParsers.asString(json['status'], fallback: 'PENDING'),
-      timeString: JsonParsers.asString(json['time'] ?? json['scan_time']),
+      address: resolvedAddress,
+      uhid: JsonParsers.asString(
+        flat['uhid'] ??
+            flat['patient_unique_id'] ??
+            flat['patientUniqueId'] ??
+            flat['mrn'],
+      ),
+      patientId: JsonParsers.asId(
+        json['patient_id'] ??
+            json['patientId'] ??
+            (json['patient'] is String ? json['patient'] : null) ??
+            (json['patient'] is Map
+                ? (json['patient']['_id'] ?? json['patient']['id'])
+                : null),
+      ),
+      counterId: JsonParsers.asString(
+        json['counter_id'] ??
+            json['counterId'] ??
+            json['counter'] ??
+            flat['counter_id'] ??
+            flat['counterId'],
+      ),
+      department: JsonParsers.asString(
+        json['department'] ?? json['dept'] ?? flat['department'],
+      ),
+      status: JsonParsers.asString(
+        json['status'] ??
+            json['check_in_status'] ??
+            json['checkInStatus'] ??
+            json['state'],
+        fallback: 'PENDING',
+      ),
+      timeString: JsonParsers.asString(
+        json['time'] ??
+            json['scan_time'] ??
+            json['scanTime'] ??
+            json['check_in_time'] ??
+            json['checkInTime'],
+      ),
       createdAt: JsonParsers.asDateTime(
         json['scanned_at'] ??
             json['scannedAt'] ??
+            json['shared_at'] ??
+            json['sharedAt'] ??
+            json['created_at'] ??
             json['createdAt'] ??
+            json['timestamp'] ??
             json['date'],
       ),
     );

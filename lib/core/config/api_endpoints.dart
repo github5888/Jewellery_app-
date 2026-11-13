@@ -37,7 +37,7 @@ class ApiEndpoints {
   // 2. Nurse Dashboard
   String get dashboard => _url('/api/dashboard');
 
-  // 3. Patient Directory & ABHA M1 / Queue
+  // 3. Patient Directory & ABDM / ABHA M1 Scan & Share Queue
   String get patients => _url('/api/patients');
   String patientDetail(String patientId) => _url('/api/patients/$patientId');
   String patientAbha(String patientId) => _url('/api/patients/$patientId/abha');
@@ -45,18 +45,68 @@ class ApiEndpoints {
       _url('/api/patients/$patientId/abha-card');
   String abhaPatient(String patientId) => _url('/api/abha/patient/$patientId');
   String abhaCard(String patientId) => _url('/api/abha/card/$patientId');
+
+  // ABDM Scan & Share routes (`/api/abdm/*`, `/api/abha/*`, `/api/opd/*`, `/api/scan-share/*`)
+  String get abdm => _url('/api/abdm');
+  String get abdmScanShare => _url('/api/abdm/scan-share');
+  String get abdmScanShareCompact => _url('/api/abdm/scanshare');
+  String get abdmScanAndShare => _url('/api/abdm/scan-and-share');
+  String get abdmScanShareCheckins => _url('/api/abdm/scan-share/checkins');
+  String get abdmScanShareRequests => _url('/api/abdm/scan-share/requests');
+  String get abdmCheckins => _url('/api/abdm/checkins');
+  String get abdmCheckInsHyphen => _url('/api/abdm/check-ins');
+  String get abdmRequests => _url('/api/abdm/requests');
+  String get abdmTokens => _url('/api/abdm/tokens');
+  String get abdmQueue => _url('/api/abdm/queue');
+  String get abdmScanShareQr => _url('/api/abdm/scan-share/qr');
+  String get abdmQr => _url('/api/abdm/qr');
+  String get abdmConfig => _url('/api/abdm/config');
+  String get abdmScanShareSimulate => _url('/api/abdm/scan-share/simulate');
+  String get abdmSimulate => _url('/api/abdm/simulate');
+  String abdmScanShareItem(String id) => _url('/api/abdm/scan-share/$id');
+  String abdmScanShareDismiss(String id) =>
+      _url('/api/abdm/scan-share/$id/dismiss');
+  String abdmScanShareComplete(String id) =>
+      _url('/api/abdm/scan-share/$id/complete');
+  String abdmCheckinItem(String id) => _url('/api/abdm/checkins/$id');
+  String abdmCheckinDismiss(String id) =>
+      _url('/api/abdm/checkins/$id/dismiss');
+
   String get abha => _url('/api/abha');
   String get abhaScanShare => _url('/api/abha/scan-share');
+  String get abhaScanShareCompact => _url('/api/abha/scanshare');
+  String get abhaScanAndShare => _url('/api/abha/scan-and-share');
+  String get abhaScanShareCheckins => _url('/api/abha/scan-share/checkins');
+  String get abhaScanShareRequests => _url('/api/abha/scan-share/requests');
   String abhaScanShareItem(String id) => _url('/api/abha/scan-share/$id');
   String abhaScanShareDismiss(String id) =>
       _url('/api/abha/scan-share/$id/dismiss');
+  String abhaScanShareComplete(String id) =>
+      _url('/api/abha/scan-share/$id/complete');
+  String abhaCheckinItem(String id) => _url('/api/abha/checkins/$id');
   String get abhaScanShareSimulate => _url('/api/abha/scan-share/simulate');
   String get abhaSimulate => _url('/api/abha/simulate');
   String get abhaScanShareQr => _url('/api/abha/scan-share/qr');
   String get abhaQr => _url('/api/abha/qr');
   String get abhaConfig => _url('/api/abha/config');
   String get abhaCheckins => _url('/api/abha/checkins');
+  String get abhaCheckInsHyphen => _url('/api/abha/check-ins');
+  String get abhaRequests => _url('/api/abha/requests');
+  String get abhaTokens => _url('/api/abha/tokens');
   String get abhaQueue => _url('/api/abha/queue');
+
+  String get opdScanShare => _url('/api/opd/scan-share');
+  String get opdAbdmCheckins => _url('/api/opd/abdm-checkins');
+  String get opdAbhaCheckins => _url('/api/opd/abha-checkins');
+  String get opdCheckins => _url('/api/opd/checkins');
+
+  String get scanShare => _url('/api/scan-share');
+  String get scanShareCompact => _url('/api/scanshare');
+  String get scanShareCheckins => _url('/api/scan-share/checkins');
+  String get scanShareQr => _url('/api/scan-share/qr');
+  String get scanShareSimulate => _url('/api/scan-share/simulate');
+  String scanShareItem(String id) => _url('/api/scan-share/$id');
+  String scanShareDismiss(String id) => _url('/api/scan-share/$id/dismiss');
   String get abhaAadhaarGenerateOtp => _url('/api/abha/aadhaar/generate-otp');
   String get abhaM1AadhaarGenerateOtp =>
       _url('/api/abha/m1/aadhaar/generate-otp');

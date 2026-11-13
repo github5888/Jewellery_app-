@@ -120,7 +120,9 @@ class _OpdTriageScreenState extends State<OpdTriageScreen> {
                       Text(
                         controller.pendingAbhaCount > 0
                             ? 'ABHA (${controller.pendingAbhaCount})'
-                            : 'ABHA',
+                            : (controller.totalAbhaCount > 0
+                                ? 'ABHA (${controller.totalAbhaCount})'
+                                : 'ABHA'),
                         style: const TextStyle(
                           color: Color(0xFF059669),
                           fontSize: 12,

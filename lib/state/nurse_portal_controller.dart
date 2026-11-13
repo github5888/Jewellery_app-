@@ -140,6 +140,8 @@ class NursePortalController extends ChangeNotifier {
   int get pendingAbhaCount =>
       _abhaQueue.where((item) => item.isPending).length;
 
+  int get totalAbhaCount => _abhaQueue.length;
+
   bool get isLoadingWorkspace => _isLoadingWorkspace;
   String? get workspaceError => _workspaceError;
 
@@ -739,10 +741,8 @@ class NursePortalController extends ChangeNotifier {
   Future<List<AbhaScanCheckinItem>> refreshAbhaQueue() async {
     try {
       final fetched = await api.fetchAbhaQueue();
-      if (fetched.isNotEmpty) {
-        _abhaQueue = fetched;
-        notifyListeners();
-      }
+      _abhaQueue = fetched;
+      notifyListeners();
       return _abhaQueue;
     } catch (_) {
       return _abhaQueue;
@@ -761,6 +761,19 @@ class NursePortalController extends ChangeNotifier {
     notifyListeners();
     refreshAbhaQueue();
     return created;
+  }
+
+  Future<void> completeAbhaCheckinItem(AbhaScanCheckinItem item) async {
+    _abhaQueue = _abhaQueue
+        .map(
+          (x) => (x.id == item.id && item.id.isNotEmpty) ||
+                  x.displayCode == item.displayCode
+              ? x.copyWith(status: 'COMPLETED')
+              : x,
+        )
+        .toList();
+    notifyListeners();
+    await api.completeAbhaScanCheckin(item.id);
   }
 
   Future<void> dismissAbhaCheckinItem(AbhaScanCheckinItem item) async {

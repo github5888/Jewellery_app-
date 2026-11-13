@@ -150,6 +150,44 @@ class SocketService {
       );
     });
 
+    // 4. ABDM Scan & Share Live Patient Check-in Alert
+    for (final evtName in const [
+      'abdm:checkin',
+      'abdm:scan_share',
+      'abha:checkin',
+      'abha:scan_share',
+      'scan_share:new',
+      'opd:checkin',
+    ]) {
+      socket.on(evtName, (raw) {
+        final map = JsonParsers.asMap(raw);
+        final patientName = JsonParsers.asString(
+          map['patient_name'] ??
+              map['patientName'] ??
+              map['name'] ??
+              (map['profile'] is Map ? map['profile']['name'] : null),
+          fallback: 'ABDM Patient',
+        );
+        final token = JsonParsers.asString(
+          map['token_number'] ??
+              map['tokenNumber'] ??
+              map['check_in_code'] ??
+              map['token'],
+        );
+        onClinicalEvent?.call(
+          RealtimeClinicalEvent(
+            eventName: evtName,
+            title: 'New ABDM Scan & Share Check-in',
+            subtitle: token.isNotEmpty
+                ? '$patientName ($token)'
+                : '$patientName shared ABHA profile',
+            timestamp: DateTime.now(),
+            payload: map,
+          ),
+        );
+      });
+    }
+
     socket.connect();
   }
 
